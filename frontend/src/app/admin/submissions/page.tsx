@@ -1,0 +1,209 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { AdminShell } from '@/components/admin/AdminShell';
+import { RequireAdmin } from '@/components/admin/RequireAdmin';
+import { Button } from '@/components/ui/Button';
+import { deleteSubmissionById, fetchSubmissions, setSubmissionStatus } from '@/services/adminSubmissions';
+import type { Submission } from '@/types/api';
+import { resolveReceiptImage } from '@/lib/assets';
+import { formatDateMn } from '@/lib/utils';
+
+type Status = 'pending' | 'approved' | 'rejected' | 'all';
+
+export default function AdminSubmissionsPage() {
+  const [status, setStatus] = useState<Status>('all');
+  const [search, setSearch] = useState('');
+  const [items, setItems] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const apiStatus = useMemo(() => (status === 'all' ? undefined : status), [status]);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchSubmissions({ status: apiStatus, search: search.trim() || undefined, limit: 50 });
+      setItems(data.items);
+    } catch {
+      setError('Баримтуудыг уншиж чадсангүй.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  return (
+    <RequireAdmin>
+      <AdminShell>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold text-white/70">Баримтууд</div>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight">Оролцогчдын бүртгэл</h1>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-white/70">Статус</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as Status)}
+                className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
+              >
+                <option value="all" className="text-slate-900">
+                  Бүгд
+                </option>
+                <option value="pending" className="text-slate-900">
+                  Pending
+                </option>
+                <option value="approved" className="text-slate-900">
+                  Approved
+                </option>
+                <option value="rejected" className="text-slate-900">
+                  Rejected
+                </option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Нэр/утас/бүтээгдэхүүн/баримтын №..."
+                className="h-10 w-full sm:w-64 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white placeholder:text-white/40 outline-none"
+              />
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                Хайх
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          {loading ? (
+            <div className="text-sm text-white/70">Уншиж байна...</div>
+          ) : error ? (
+            <div className="text-sm text-rose-200">{error}</div>
+          ) : items.length === 0 ? (
+            <div className="text-sm text-white/70">Мэдээлэл алга.</div>
+          ) : (
+            <div className="grid gap-3">
+              {items.map((s) => (
+                <div key={s._id} className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-base font-extrabold tracking-tight text-white truncate">{s.fullName}</div>
+                        <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15">
+                          {s.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="text-white/80">
+                          <span className="text-white/55">Phone:</span> <span className="font-semibold">{s.phone}</span>
+                        </div>
+                        <div className="text-white/80">
+                          <span className="text-white/55">Product:</span>{' '}
+                          <span className="font-semibold">{s.productName}</span>
+                        </div>
+                        <div className="text-white/85">
+                          <span className="text-white/55">Receipt #:</span>{' '}
+                          <span className="font-extrabold">{s.receiptNumber}</span>
+                        </div>
+                        <div className="text-white/70">
+                          <span className="text-white/55">Created:</span>{' '}
+                          <span className="font-semibold">{s.createdAt ? formatDateMn(new Date(s.createdAt)) : '-'}</span>
+                        </div>
+                        <div className="text-white/70">
+                          <span className="text-white/55">Approved:</span>{' '}
+                          <span className="font-semibold">{s.approvedAt ? formatDateMn(new Date(s.approvedAt)) : '-'}</span>
+                        </div>
+                        <div className="text-white/80">
+                          <span className="text-white/55">Amount:</span>{' '}
+                          <span className="font-semibold">{Number(s.amount).toLocaleString()}₮</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={async () => {
+                            if (!s._id) return;
+                            await setSubmissionStatus(s._id, 'approved');
+                            await load();
+                          }}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            if (!s._id) return;
+                            await setSubmissionStatus(s._id, 'rejected');
+                            await load();
+                          }}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            if (!s._id) return;
+                            await setSubmissionStatus(s._id, 'pending');
+                            await load();
+                          }}
+                        >
+                          Pending
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ring-rose-300/25 text-rose-100 hover:bg-rose-500/10"
+                          onClick={async () => {
+                            if (!s._id) return;
+                            await deleteSubmissionById(s._id);
+                            await load();
+                          }}
+                        >
+                          Устгах
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="w-full lg:w-[220px] shrink-0">
+                      <a
+                        href={resolveReceiptImage(s.receiptImage)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-3xl bg-white/5 ring-1 ring-white/10"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={resolveReceiptImage(s.receiptImage)}
+                          alt="Баримт"
+                          className="h-44 w-full object-cover"
+                          loading="lazy"
+                        />
+                      </a>
+                      <div className="mt-2 text-xs text-white/55">Зураг дээр дарж томоор нээнэ.</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AdminShell>
+    </RequireAdmin>
+  );
+}
+

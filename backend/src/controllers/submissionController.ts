@@ -1,0 +1,259 @@
+import type { Request, Response } from 'express';
+import { z } from 'zod';
+import { SubmissionModel, SubmissionStatus } from '../models/Submission.js';
+import type { AuthRequest } from '../types/express.js';
+import { UserModel } from '../models/User.js';
+
+const CreateSubmissionPublicSchema = z.object({
+  fullName: z.string().min(2).max(120),
+  phone: z.string().min(6).max(32),
+  email: z.string().email().optional().or(z.literal('')),
+  productName: z.string().min(1).max(120),
+  receiptNumber: z.string().min(5).max(64),
+  amount: z.coerce.number().min(0)
+});
+
+const CreateSubmissionUserSchema = z.object({
+  productName: z.string().min(1).max(120),
+  receiptNumber: z.string().min(5).max(64),
+  amount: z.coerce.number().min(0)
+});
+
+export async function createSubmission(req: Request, res: Response) {
+  const parsed = CreateSubmissionPublicSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
+
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) return res.status(400).json({ message: 'Receipt image is required' });
+  if (!file.buffer) return res.status(400).json({ message: 'Receipt image is required' });
+
+  const submission = await SubmissionModel.create({
+    fullName: parsed.data.fullName,
+    phone: parsed.data.phone,
+    email: parsed.data.email || undefined,
+    productName: parsed.data.productName,
+    receiptNumber: parsed.data.receiptNumber,
+    amount: parsed.data.amount,
+    receiptImageBase64: file.buffer.toString('base64'),
+    receiptImageMime: file.mimetype,
+    status: 'pending',
+    approvedAt: null
+  });
+
+  const submissionObj = submission.toObject() as any;
+  const { receiptImageBase64, ...safe } = submissionObj;
+  safe.receiptImage = `/api/submissions/${submission._id.toString()}/receipt`;
+
+  return res.status(201).json({ submission: safe });
+}
+
+export async function createSubmissionForUser(req: AuthRequest, res: Response) {
+  if (!req.user?.id) return res.status(401).json({ message: 'Unauthorized' });
+
+  const parsed = CreateSubmissionUserSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
+
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file?.buffer) return res.status(400).json({ message: 'Receipt image is required' });
+
+  const user = await UserModel.findById(req.user.id).lean();
+  if (!user) return res.status(401).json({ message: 'Unauthorized' });
+
+  const submission = await SubmissionModel.create({
+    fullName: user.fullName,
+    phone: user.phone,
+    productName: parsed.data.productName,
+    receiptNumber: parsed.data.receiptNumber,
+    amount: parsed.data.amount,
+    receiptImageBase64: file.buffer.toString('base64'),
+    receiptImageMime: file.mimetype,
+    status: 'pending',
+    approvedAt: null
+  });
+
+  const submissionObj = submission.toObject() as any;
+  const { receiptImageBase64, ...safe } = submissionObj;
+  safe.receiptImage = `/api/submissions/${submission._id.toString()}/receipt`;
+
+  return res.status(201).json({ submission: safe });
+}
+
+export async function listMySubmissions(req: Request, res: Response) {
+  const q = z
+    .object({
+      phone: z.string().min(6).max(32)
+    })
+    .safeParse(req.query);
+  if (!q.success) return res.status(400).json({ message: 'Invalid query' });
+
+  const itemsRaw = await SubmissionModel.find({ phone: q.data.phone })
+    .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+
+  const items = itemsRaw.map((s: any) => ({
+    ...s,
+    receiptImage: `/api/submissions/${String(s._id)}/receipt`
+  }));
+
+  return res.json({ items });
+}
+
+export async function listMySubmissionsAuthed(req: AuthRequest, res: Response) {
+  if (!req.user?.phone) return res.status(401).json({ message: 'Unauthorized' });
+  const itemsRaw = await SubmissionModel.find({ phone: req.user.phone })
+    .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+
+  const items = itemsRaw.map((s: any) => ({
+    ...s,
+    receiptImage: `/api/submissions/${String(s._id)}/receipt`
+  }));
+
+  return res.json({ items });
+}
+
+export async function listSubmissions(req: AuthRequest, res: Response) {
+  const q = z
+    .object({
+      status: z.enum(SubmissionStatus).optional(),
+      search: z.string().optional(),
+      page: z.coerce.number().int().positive().default(1),
+      limit: z.coerce.number().int().positive().max(200).default(20)
+    })
+    .safeParse(req.query);
+
+  if (!q.success) return res.status(400).json({ message: 'Invalid query' });
+
+  const filter: Record<string, unknown> = {};
+  if (q.data.status) filter.status = q.data.status;
+  if (q.data.search) {
+    const s = q.data.search.trim();
+    if (s.length) {
+      filter.$or = [
+        { fullName: { $regex: s, $options: 'i' } },
+        { phone: { $regex: s, $options: 'i' } },
+        { productName: { $regex: s, $options: 'i' } },
+        { receiptNumber: { $regex: s, $options: 'i' } }
+      ];
+    }
+  }
+
+  const skip = (q.data.page - 1) * q.data.limit;
+  const [itemsRaw, total] = await Promise.all([
+    SubmissionModel.find(filter)
+      .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(q.data.limit)
+      .lean(),
+    SubmissionModel.countDocuments(filter)
+  ]);
+
+  const items = itemsRaw.map((s: any) => ({
+    ...s,
+    receiptImage: `/api/submissions/${String(s._id)}/receipt`
+  }));
+
+  return res.json({
+    items,
+    page: q.data.page,
+    limit: q.data.limit,
+    total
+  });
+}
+
+export async function getSubmissionReceiptImage(req: Request, res: Response) {
+  const id = req.params.id;
+  const doc = await SubmissionModel.findById(id)
+    .select({ receiptImageBase64: 1, receiptImageData: 1, receiptImageMime: 1 })
+    .lean();
+  if (!doc) return res.status(404).end();
+  if (!doc.receiptImageMime) return res.status(404).end();
+
+  res.setHeader('Content-Type', doc.receiptImageMime);
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+
+  const anyDoc = doc as any;
+  if (anyDoc.receiptImageBase64) {
+    const bytes = Buffer.from(anyDoc.receiptImageBase64, 'base64');
+    return res.status(200).send(bytes);
+  }
+  if (anyDoc.receiptImageData) {
+    const v = anyDoc.receiptImageData;
+    // Handles: Buffer, BSON Binary, or { type: 'Buffer', data: number[] }
+    if (Buffer.isBuffer(v)) return res.status(200).send(v);
+    if (Buffer.isBuffer(v.buffer)) return res.status(200).send(v.buffer);
+    if (Array.isArray(v.data)) return res.status(200).send(Buffer.from(v.data));
+    if (typeof v === 'object' && v !== null) {
+      // Some BSON Binary shapes: { _bsontype: 'Binary', buffer: <Buffer>, ... }
+      const maybeBuf = (v as any).buffer;
+      if (Buffer.isBuffer(maybeBuf)) return res.status(200).send(maybeBuf);
+    }
+  }
+  return res.status(404).end();
+}
+
+export async function patchSubmissionStatus(req: AuthRequest, res: Response) {
+  const id = req.params.id;
+  const body = z
+    .object({
+      status: z.enum(SubmissionStatus)
+    })
+    .safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: 'Invalid payload' });
+
+  const nextApprovedAt = body.data.status === 'approved' ? new Date() : null;
+  const updated = await SubmissionModel.findByIdAndUpdate(
+    id,
+    { status: body.data.status, approvedAt: nextApprovedAt },
+    { new: true }
+  );
+  if (!updated) return res.status(404).json({ message: 'Not found' });
+  return res.json({ submission: updated });
+}
+
+export async function listEligibleForDraw(req: AuthRequest, res: Response) {
+  const q = z
+    .object({
+      startDate: z.string().min(1),
+      endDate: z.string().min(1)
+    })
+    .safeParse(req.query);
+  if (!q.success) return res.status(400).json({ message: 'Invalid query' });
+
+  const start = new Date(q.data.startDate);
+  const end = new Date(q.data.endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return res.status(400).json({ message: 'Invalid date range' });
+  }
+
+  const items = await SubmissionModel.find({
+    status: 'approved',
+    approvedAt: { $gte: start, $lte: end }
+  })
+    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0 })
+    .sort({ approvedAt: -1 })
+    .limit(5000)
+    .lean();
+
+  // Only expose receipt numbers for wheel list; admin can see details elsewhere.
+  return res.json({
+    items: items.map((s: any) => ({
+      id: String(s._id),
+      receiptNumber: s.receiptNumber
+    })),
+    count: items.length
+  });
+}
+
+export async function deleteSubmission(req: AuthRequest, res: Response) {
+  const id = req.params.id;
+  const deleted = await SubmissionModel.findByIdAndDelete(id);
+  if (!deleted) return res.status(404).json({ message: 'Not found' });
+  return res.json({ ok: true });
+}
+
