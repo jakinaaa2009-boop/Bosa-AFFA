@@ -53,20 +53,27 @@ export function ProductsCarouselSection() {
     const el = scrollerRef.current;
     if (!el) return;
 
-    const stepPx = 1; // smooth speed
-    const tickMs = 18; // ~55fps
+    const getStep = () => {
+      const first = el.firstElementChild as HTMLElement | null;
+      if (!first) return Math.max(220, Math.round(el.clientWidth * 0.9));
+      // card width + gap (gap-4 => 16px)
+      return first.getBoundingClientRect().width + 16;
+    };
 
     const id = window.setInterval(() => {
       const max = el.scrollWidth - el.clientWidth;
       if (max <= 0) return;
 
+      const step = getStep();
+      const next = el.scrollLeft + step;
+
       // Loop back when reaching the end
-      if (el.scrollLeft >= max - 2) {
+      if (next >= max - 4) {
         el.scrollTo({ left: 0, behavior: 'smooth' });
       } else {
-        el.scrollLeft += stepPx;
+        el.scrollTo({ left: next, behavior: 'smooth' });
       }
-    }, tickMs);
+    }, 2600);
 
     return () => window.clearInterval(id);
   }, [paused]);
@@ -81,11 +88,11 @@ export function ProductsCarouselSection() {
               Бүтээгдэхүүнүүд
             </h2>
           </div>
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => scrollByCards(-1)}
-              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/15 hover:bg-white/15 transition"
+              className="rounded-full bg-white/10 px-3 py-2 text-sm font-semibold ring-1 ring-white/15 hover:bg-white/15 transition"
               aria-label="Өмнөх"
             >
               ←
@@ -93,7 +100,7 @@ export function ProductsCarouselSection() {
             <button
               type="button"
               onClick={() => scrollByCards(1)}
-              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/15 hover:bg-white/15 transition"
+              className="rounded-full bg-white/10 px-3 py-2 text-sm font-semibold ring-1 ring-white/15 hover:bg-white/15 transition"
               aria-label="Дараах"
             >
               →
@@ -116,7 +123,7 @@ export function ProductsCarouselSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-80px' }}
                 transition={{ duration: 0.45, delay: Math.min(0.18, idx * 0.01) }}
-                className="snap-start shrink-0 w-[240px] sm:w-[280px]"
+                className="snap-start shrink-0 w-[78vw] max-w-[320px] sm:w-[280px]"
               >
                 <GlassCard className={cn('p-5 group')}>
                   <div className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-4">

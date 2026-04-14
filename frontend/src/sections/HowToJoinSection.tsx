@@ -13,7 +13,7 @@ const steps = [
 
 export function HowToJoinSection() {
   return (
-    <section id="how-to-join" className="px-5 pt-16 sm:pt-20">
+    <section id="how-to-join" className="px-5 pt-12 sm:pt-20">
       <div className="mx-auto max-w-6xl">
         <div className="flex items-end justify-between gap-6">
           <div>

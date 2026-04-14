@@ -9,7 +9,7 @@ export function HeroSection() {
   return (
     <section id="home" className="relative w-full overflow-hidden">
       {/* Full-width dominant banner */}
-      <div className="relative h-[300px] sm:h-[360px] lg:h-[500px]">
+      <div className="relative h-[260px] sm:h-[360px] lg:h-[500px]">
         <Image
           src="/banner.jpg"
           alt="Кампанит баннер"
@@ -22,14 +22,14 @@ export function HeroSection() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_450px_at_20%_20%,rgba(56,189,248,0.18),transparent_60%),radial-gradient(700px_380px_at_70%_30%,rgba(37,99,235,0.14),transparent_60%)]" />
 
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full px-6 lg:px-16">
+          <div className="w-full px-5 sm:px-6 lg:px-16">
             <div className="mx-auto max-w-6xl">
               <div className="max-w-2xl">
                 <motion.h1
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.7, delay: 0.05 }}
-                  className="text-4xl font-extrabold tracking-tight text-white drop-shadow sm:text-5xl lg:text-6xl"
+                  className="text-3xl leading-[1.05] font-extrabold tracking-tight text-white drop-shadow sm:text-5xl lg:text-6xl"
                 >
                   {CAMPAIGN.title}
                 </motion.h1>
@@ -44,7 +44,7 @@ export function HeroSection() {
                 </motion.p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Button href="#receipt" variant="primary" size="lg">
+                  <Button href="/receipt" variant="primary" size="lg">
                     Баримт оруулах
                   </Button>
                   <Button href="#how-to-join" variant="secondary" size="lg">

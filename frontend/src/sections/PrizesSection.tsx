@@ -16,7 +16,7 @@ const prizeImages: Record<string, string> = {
 
 export function PrizesSection() {
   return (
-    <section id="prizes" className="px-5 pt-16 sm:pt-20">
+    <section id="prizes" className="px-5 pt-12 sm:pt-20">
       <div className="mx-auto max-w-6xl">
         <div>
           <div className="text-xs font-semibold text-white/70">ШАГНАЛЫН САН</div>
