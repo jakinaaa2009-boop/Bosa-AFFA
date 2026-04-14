@@ -22,6 +22,10 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
   // Copy headers except host-related ones; preserve auth headers.
   const headers = new Headers(req.headers);
   headers.delete('host');
+  // Let fetch compute framing headers for the forwarded body.
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+  headers.delete('connection');
 
   const method = req.method.toUpperCase();
   const hasBody = !['GET', 'HEAD'].includes(method);
@@ -29,7 +33,10 @@ async function proxy(req: Request, ctx: { params: Promise<{ path?: string[] }> }
   const upstream = await fetch(target, {
     method,
     headers,
-    body: hasBody ? await req.arrayBuffer() : undefined,
+    // Stream through when possible (supports JSON + multipart).
+    body: hasBody ? req.body : undefined,
+    // Node fetch requires duplex when streaming request bodies.
+    ...(hasBody ? ({ duplex: 'half' } as any) : null),
     redirect: 'manual'
   });
 
