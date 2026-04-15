@@ -137,8 +137,7 @@ export function ProductsCarouselSection() {
                       />
                     </div>
                   </div>
-                  <div className="mt-4 text-sm font-extrabold tracking-tight text-white">{p.name}</div>
-                  <div className="mt-1 text-xs text-white/65">Урамшуулалд хамрагдана</div>
+                  <div className="mt-4 text-xs font-semibold text-white/65">Урамшуулалд хамрагдана</div>
                 </GlassCard>
               </motion.div>
             ))}
