@@ -3,11 +3,11 @@ import { withAdminAuth } from './admin';
 import type { Winner } from '@/types/api';
 
 export async function spin(prizeName: string, startDate: string, endDate: string) {
-  const res = await api.post<{ winner: Winner }>(
+  const res = await api.post<{ winner: Winner; forced?: { requested?: string | null; applied?: boolean; reason?: string | null } }>(
     '/api/draw/spin',
     { prizeName, startDate, endDate },
     { headers: withAdminAuth() }
   );
-  return res.data.winner;
+  return res.data;
 }
 

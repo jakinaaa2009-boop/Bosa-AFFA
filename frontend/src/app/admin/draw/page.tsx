@@ -32,6 +32,7 @@ export default function AdminDrawPage() {
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forcedNote, setForcedNote] = useState<string | null>(null);
   const [rangeStart, setRangeStart] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
@@ -72,6 +73,7 @@ export default function AdminDrawPage() {
 
   async function onSpin() {
     setError(null);
+    setForcedNote(null);
     setWinner(null);
     setSpinning(true);
     try {
@@ -79,8 +81,11 @@ export default function AdminDrawPage() {
       const endIso = new Date(`${rangeEnd}T23:59:59.999Z`).toISOString();
       // small UX delay for wheel effect
       await new Promise((r) => setTimeout(r, 900));
-      const w = await spin(prizeName, startIso, endIso);
-      setWinner(w);
+      const data = await spin(prizeName, startIso, endIso);
+      setWinner(data.winner);
+      if (prizeName === 'PlayStation 5' && data.forced?.requested && data.forced?.applied === false) {
+        setForcedNote(data.forced?.reason ?? 'Forced receipt хэрэгжээгүй. Random сонголт хийгдлээ.');
+      }
     } catch {
       setError('Сугалаа явуулах боломжгүй. Approved оролцогч байхгүй эсвэл давхардал гарсан байж магадгүй.');
     } finally {
@@ -242,6 +247,11 @@ export default function AdminDrawPage() {
             </div>
 
             {error ? <div className="mt-4 text-sm text-rose-200">{error}</div> : null}
+            {forcedNote ? (
+              <div className="mt-3 rounded-2xl bg-amber-400/10 ring-1 ring-amber-200/25 px-4 py-3 text-sm text-amber-100">
+                {forcedNote}
+              </div>
+            ) : null}
 
             <div className="mt-6">
               <Button className="w-full" onClick={() => void onSpin()}>

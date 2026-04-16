@@ -7,6 +7,7 @@ import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
 import type { AuthRequest } from '../types/express.js';
 import { clearForceCookie, setForceCookie } from '../middleware/forceAuth.js';
 import { ForceAdminModel } from '../models/ForceAdmin.js';
+import { SubmissionModel } from '../models/Submission.js';
 
 const SecretLoginSchema = z.object({
   username: z.string().min(1),
@@ -53,6 +54,15 @@ export async function setForcedReceipt(req: AuthRequest, res: Response) {
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
 
   const receiptNumber = parsed.data.receiptNumber;
+
+  // Strict validation: if set, it must exist as an approved receipt in "Баримт" (submissions).
+  // Note: eligible-by-date-range is validated at spin time.
+  if (receiptNumber) {
+    const exists = await SubmissionModel.exists({ receiptNumber, status: 'approved' });
+    if (!exists) {
+      return res.status(400).json({ message: 'Баримтын дугаар олдсонгүй (approved байх ёстой).' });
+    }
+  }
   const doc = await ForcedReceiptModel.findOneAndUpdate(
     {},
     { receiptNumber },

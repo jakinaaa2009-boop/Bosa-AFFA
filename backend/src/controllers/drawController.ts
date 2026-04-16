@@ -37,8 +37,13 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const forced =
     prizeName === 'PlayStation 5' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
   let winnerSubmission = null as any;
-  if (forced?.receiptNumber) {
-    winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forced.receiptNumber });
+  const forcedRequested = (forced?.receiptNumber ?? '').trim();
+  let forcedApplied = false;
+  let forcedReason: string | null = null;
+  if (forcedRequested) {
+    winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forcedRequested });
+    if (winnerSubmission) forcedApplied = true;
+    else forcedReason = 'Forced receipt нь сонгосон хугацааны eligible (approved) жагсаалтад байхгүй байна.';
   }
 
   if (!winnerSubmission) {
@@ -63,6 +68,11 @@ export async function spinDraw(req: AuthRequest, res: Response) {
     });
 
     return res.json({
+      forced: {
+        requested: forcedRequested || null,
+        applied: forcedApplied,
+        reason: forcedApplied ? null : forcedReason
+      },
       winner: {
         id: winner._id.toString(),
         receiptNumber: winnerSubmission.receiptNumber,
