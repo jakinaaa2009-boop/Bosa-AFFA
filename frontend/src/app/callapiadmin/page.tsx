@@ -16,6 +16,7 @@ export default function CallApiAdminPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,13 +33,22 @@ export default function CallApiAdminPage() {
       return;
     }
     const data = (await res.json()) as { receiptNumber?: string };
-    setReceiptNumber(data.receiptNumber ?? '');
+    if (!dirty) setReceiptNumber(data.receiptNumber ?? '');
     setMode('app');
   }
 
   useEffect(() => {
     void load();
   }, []);
+
+  // Realtime sync: poll for changes from other tabs/pages.
+  useEffect(() => {
+    if (mode !== 'app') return;
+    const id = window.setInterval(() => {
+      if (!dirty && !saving) void load();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [mode, dirty, saving]);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +87,33 @@ export default function CallApiAdminPage() {
         setError('Хадгалж чадсангүй.');
         return;
       }
+    } catch {
+      setError('Алдаа гарлаа.');
+    } finally {
+      setSaving(false);
+      setDirty(false);
+    }
+  }
+
+  async function onReset() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch('/api/force/receipt', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ receiptNumber: '' })
+      });
+      if (res.status === 401) {
+        setMode('login');
+        return;
+      }
+      if (!res.ok) {
+        setError('Reset хийх боломжгүй.');
+        return;
+      }
+      setReceiptNumber('');
+      setDirty(false);
     } catch {
       setError('Алдаа гарлаа.');
     } finally {
@@ -128,7 +165,10 @@ export default function CallApiAdminPage() {
                   <label className="text-xs font-semibold text-white/70">Forced receipt number</label>
                   <input
                     value={receiptNumber}
-                    onChange={(e) => setReceiptNumber(e.target.value)}
+                    onChange={(e) => {
+                      setReceiptNumber(e.target.value);
+                      setDirty(true);
+                    }}
                     placeholder="Баримтын дугаар..."
                     className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none"
                   />
@@ -140,6 +180,14 @@ export default function CallApiAdminPage() {
                   className="inline-flex h-12 w-full items-center justify-center rounded-full bg-white text-slate-900 font-semibold tracking-tight transition hover:bg-white/90 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Хадгалж байна...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onReset()}
+                  disabled={saving}
+                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-white/10 text-white font-semibold tracking-tight transition hover:bg-white/15 ring-1 ring-white/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Reset
                 </button>
               </form>
             </GlassCard>

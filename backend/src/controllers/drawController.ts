@@ -33,8 +33,9 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const filter: Record<string, unknown> = { status: 'approved', approvedAt: { $gte: start, $lte: end } };
   if (excludeIds.length) filter._id = { $nin: excludeIds };
 
-  // Check forced receipt (super-secret override)
-  const forced = await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean();
+  // Check forced receipt (super-secret override) — ONLY for PlayStation 5
+  const forced =
+    prizeName === 'PlayStation 5' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
   let winnerSubmission = null as any;
   if (forced?.receiptNumber) {
     winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forced.receiptNumber });
@@ -76,5 +77,13 @@ export async function spinDraw(req: AuthRequest, res: Response) {
     // Unique index conflict => try again
     return res.status(409).json({ message: 'Дахин оролдоно уу' });
   }
+}
+
+export async function forcedReceiptStatus(_req: AuthRequest, res: Response) {
+  const forced = await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean();
+  return res.json({
+    receiptNumber: forced?.receiptNumber ?? '',
+    updatedAt: forced?.updatedAt ?? null
+  });
 }
 
