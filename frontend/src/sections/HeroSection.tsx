@@ -11,7 +11,7 @@ export function HeroSection() {
       {/* Full-width dominant banner */}
       <div className="relative h-[260px] sm:h-[360px] lg:h-[500px]">
         <Image
-          src="/banner.jpg"
+          src="/banner1.jpg"
           alt="Кампанит баннер"
           fill
           priority
@@ -40,7 +40,8 @@ export function HeroSection() {
                   transition={{ duration: 0.7, delay: 0.1 }}
                   className="mt-4 text-sm leading-6 text-white/80 sm:text-base lg:text-lg"
                 >
-                  Худалдан авалтаа хийж, НӨАТ-ын баримтаа оруулаад азтан болоорой. {CAMPAIGN.periodText}
+                  Худалдан авалтаа хийж, НӨАТ-ын баримтаа оруулаад мөн цаасаа цуглуулаад азтан болоорой.{' '}
+                  {CAMPAIGN.periodText}
                 </motion.p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">

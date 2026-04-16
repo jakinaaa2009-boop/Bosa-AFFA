@@ -3,7 +3,10 @@ import { HeroSection } from '@/sections/HeroSection';
 import { HowToJoinSection } from '@/sections/HowToJoinSection';
 import { PrizesSection } from '@/sections/PrizesSection';
 import { ProductsCarouselSection } from '@/sections/ProductsCarouselSection';
+import { DrawScheduleSection } from '@/sections/DrawScheduleSection';
 import { WinnersSection } from '@/sections/WinnersSection';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -19,13 +22,49 @@ export default function Home() {
         <HowToJoinSection />
         <PrizesSection />
         <ProductsCarouselSection />
+        <DrawScheduleSection />
         <WinnersSection />
         {/* Receipt is now on /receipt with login/register gate */}
       </main>
 
       <footer className="px-5 py-10">
-        <div className="mx-auto max-w-6xl rounded-3xl bg-white/5 ring-1 ring-white/10 px-6 py-8 text-sm text-white/70">
-          © 2026 Урамшуулалт сугалаа. Бүх эрх хуулиар хамгаалагдсан.
+        <div className="mx-auto max-w-6xl rounded-3xl bg-white/5 ring-1 ring-white/10 px-6 py-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Image
+                src="/logo1.png"
+                alt="Лого"
+                width={44}
+                height={44}
+                className="h-11 w-11 rounded-2xl bg-white/10 ring-1 ring-white/15 object-contain p-1.5"
+              />
+              <Image
+                src="/logo2.png"
+                alt="Лого"
+                width={150}
+                height={44}
+                className="h-9 w-auto object-contain"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-white/75">
+              <Link href="/receipt" className="hover:text-white transition-colors">
+                Баримт оруулах
+              </Link>
+              <a
+                href="/juram/udirdamj.pdf"
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                Удирдамж
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-6 text-sm text-white/60">
+            © 2026 Урамшуулалт сугалаа. Бүх эрх хуулиар хамгаалагдсан.
+          </div>
         </div>
       </footer>
     </div>

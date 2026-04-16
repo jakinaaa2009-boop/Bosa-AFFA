@@ -22,8 +22,17 @@ export function HowToJoinSection() {
               Хэрхэн оролцох вэ?
             </h2>
           </div>
-          <div className="hidden sm:block text-sm text-white/65 max-w-md text-right">
-            Хялбар 4 алхам. Баримтаа оруулаад азтан болоорой.
+          <div className="hidden sm:block max-w-md text-right">
+            <div className="space-y-2 text-sm">
+              {['3 Mogul extreme = 1 эрх', '1 Cofler block = 1 эрх', '1 Bon o Bon = 1 эрх'].map((t) => (
+                <div
+                  key={t}
+                  className="inline-flex items-center justify-end rounded-full bg-white/10 px-4 py-2 font-extrabold text-white ring-1 ring-white/15 shadow-[0_18px_45px_rgba(56,189,248,0.12)]"
+                >
+                  {t}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -46,6 +46,7 @@ export async function spinDraw(req: AuthRequest, res: Response) {
       phone: winnerSubmission.phone,
       productName: winnerSubmission.productName,
       prizeName,
+      receiptNumber: winnerSubmission.receiptNumber,
       drawDate: new Date(),
       submissionId: winnerSubmission._id
     });

@@ -6,12 +6,12 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { PRIZES } from '@/lib/constants';
 
 const prizeImages: Record<string, string> = {
-  'Ухаалаг ТВ': '/prizes/smartTV.png',
-  'Чихэвч': '/prizes/headphone.png',
+  'Samsung crystal UHD 50 inch smart tv': '/prizes/smartTV.png',
+  'Airpod gen 4': '/prizes/headphone.png',
   'PlayStation 5': '/prizes/playstation5.png',
-  'Пүүз / спорт шагнал': '/prizes/puuz.png',
-  'Аргентины 2026 өмсгөл': '/prizes/jersey.png',
-  'FIFA 2026 хөлбөмбөг': '/prizes/fifa.png'
+  'Пүүз / спорт шагнал- 500,000₮ воучер': '/prizes/puzz.png',
+  'ФИФА 2026 тэмцээний Аргентины албан ёсны өмсгөл': '/prizes/jersey.png',
+  'ФИФА 2026 тэмцээний албан ёсны бөмбөг': '/prizes/fifa.png'
 };
 
 export function PrizesSection() {
@@ -54,7 +54,6 @@ export function PrizesSection() {
                     <div className="mt-5 flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="text-base font-extrabold tracking-tight text-white">{p.name}</div>
-                        <div className="mt-2 text-sm text-white/70">Шагналын тоо хэмжээ</div>
                       </div>
                       <div className="shrink-0 rounded-2xl bg-white px-4 py-2 text-sm font-extrabold text-slate-900 shadow-[0_18px_45px_rgba(56,189,248,0.16)]">
                         x{p.qty}

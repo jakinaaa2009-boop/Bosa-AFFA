@@ -11,8 +11,21 @@ import { spin } from '@/services/draw';
 import type { Winner } from '@/types/api';
 import { formatDateMn } from '@/lib/utils';
 import { fetchEligibleDraw } from '@/services/adminEligibleDraw';
+import Image from 'next/image';
 
 export default function AdminDrawPage() {
+  const prizeThumbs: Record<string, string> = useMemo(
+    () => ({
+      'Samsung crystal UHD 50 inch smart tv': '/prizes/smartTV.png',
+      'Airpod gen 4': '/prizes/headphone.png',
+      'PlayStation 5': '/prizes/playstation5.png',
+      'Пүүз / спорт шагнал- 500,000₮ воучер': '/prizes/puzz.png',
+      'ФИФА 2026 тэмцээний Аргентины албан ёсны өмсгөл': '/prizes/jersey.png',
+      'ФИФА 2026 тэмцээний албан ёсны бөмбөг': '/prizes/fifa.png'
+    }),
+    []
+  );
+
   const prizeOptions = useMemo(() => PRIZES.map((p) => p.name), []);
   const [prizeName, setPrizeName] = useState<string>(prizeOptions[0] ?? 'Ухаалаг ТВ');
   const [spinning, setSpinning] = useState(false);
@@ -119,21 +132,44 @@ export default function AdminDrawPage() {
                 className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-white/70">Шагнал</label>
-              <select
-                value={prizeName}
-                onChange={(e) => setPrizeName(e.target.value)}
-                className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
-              >
-                {prizeOptions.map((p) => (
-                  <option key={p} value={p} className="text-slate-900">
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <GlassCard className="p-4 sm:p-5">
+            <div>
+              <div className="text-xs font-semibold text-white/70">Шагнал сонгох</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                  {prizeOptions.map((p) => {
+                    const active = p === prizeName;
+                  const thumb = prizeThumbs[p];
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPrizeName(p)}
+                        className={[
+                          'rounded-2xl px-4 py-2 text-sm font-extrabold transition text-left',
+                          'ring-1',
+                          active
+                            ? 'bg-white text-slate-900 ring-white shadow-[0_18px_45px_rgba(56,189,248,0.18)]'
+                            : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                        ].join(' ')}
+                      >
+                      <span className="flex items-center gap-3">
+                        {thumb ? (
+                          <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/15">
+                            <Image src={thumb} alt="" fill className="object-contain p-1" sizes="32px" />
+                          </span>
+                        ) : null}
+                        <span className="block max-w-[320px] whitespace-normal leading-5">{p}</span>
+                      </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          </GlassCard>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">

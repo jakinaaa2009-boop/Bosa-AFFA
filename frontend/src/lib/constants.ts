@@ -1,7 +1,7 @@
 export const CAMPAIGN = {
   title: 'Урамшуулалт Сугалаа',
-  periodText: '2026 оны 4 дүгээр сарын 15-наас 7 дугаар сарын 15-ныг дуустал үргэлжилнэ.',
-  endDateIso: '2026-07-15T23:59:59+08:00'
+  periodText: '2026 оны 4 дүгээр сарын 15-наас 7 дугаар сарын 31-нийг дуустал үргэлжилнэ.',
+  endDateIso: '2026-07-31T23:59:59+08:00'
 } as const;
 
 export const MENU = [
@@ -14,12 +14,12 @@ export const MENU = [
 ] as const;
 
 export const PRIZES = [
-  { name: 'Ухаалаг ТВ', qty: 7 },
-  { name: 'Чихэвч', qty: 3 },
+  { name: 'Samsung crystal UHD 50 inch smart tv', qty: 7 },
+  { name: 'Airpod gen 4', qty: 3 },
   { name: 'PlayStation 5', qty: 7 },
-  { name: 'Пүүз / спорт шагнал', qty: 7 },
-  { name: 'Аргентины 2026 өмсгөл', qty: 14 },
-  { name: 'FIFA 2026 хөлбөмбөг', qty: 14 }
+  { name: 'Пүүз / спорт шагнал- 500,000₮ воучер', qty: 7 },
+  { name: 'ФИФА 2026 тэмцээний Аргентины албан ёсны өмсгөл', qty: 14 },
+  { name: 'ФИФА 2026 тэмцээний албан ёсны бөмбөг', qty: 14 }
 ] as const;
 
 export const PRODUCTS = [

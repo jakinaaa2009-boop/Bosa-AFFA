@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -8,16 +7,21 @@ import { cn } from '@/lib/utils';
 
 type ProductItem = { name: string; image: string };
 
-const products: ProductItem[] = Array.from({ length: 21 }, (_, i) => {
+const ASSET_VERSION = '2026-04-15';
+
+const products: ProductItem[] = Array.from({ length: 23 }, (_, i) => {
   const n = i + 1;
-  return { name: `Бүтээгдэхүүн ${n}`, image: `/products/product${n}.png` };
+  // Add version query to bust browser/CDN caches after you replace/remove images.
+  return { name: `Бүтээгдэхүүн ${n}`, image: `/products/product${n}.png?v=${ASSET_VERSION}` };
 });
 
 export function ProductsCarouselSection() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [paused, setPaused] = useState(false);
+  const [hidden, setHidden] = useState<Record<string, true>>({});
 
   const items = useMemo(() => products, []);
+  const visibleItems = useMemo(() => items.filter((p) => !hidden[p.image]), [items, hidden]);
 
   function scrollByCards(dir: 1 | -1) {
     const el = scrollerRef.current;
@@ -116,9 +120,9 @@ export function ProductsCarouselSection() {
             ref={scrollerRef}
             className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scroll-px-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {items.map((p, idx) => (
+            {visibleItems.map((p, idx) => (
               <motion.div
-                key={p.image}
+                key={`${p.image}-${idx}`}
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-80px' }}
@@ -128,12 +132,15 @@ export function ProductsCarouselSection() {
                 <GlassCard className={cn('p-5 group')}>
                   <div className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-4">
                     <div className="relative aspect-[4/3] w-full">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={p.image}
                         alt={p.name}
-                        fill
-                        className="object-contain drop-shadow-[0_16px_40px_rgba(2,6,23,0.55)] transition-transform duration-200 group-hover:scale-[1.03]"
-                        sizes="280px"
+                        className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_16px_40px_rgba(2,6,23,0.55)] transition-transform duration-200 group-hover:scale-[1.03]"
+                        loading="lazy"
+                        onError={() => {
+                          setHidden((prev) => (prev[p.image] ? prev : { ...prev, [p.image]: true }));
+                        }}
                       />
                     </div>
                   </div>
