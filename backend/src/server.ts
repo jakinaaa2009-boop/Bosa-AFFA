@@ -4,6 +4,7 @@ import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
 import { createApp } from './app.js';
 import { ensureDefaultAdmin } from './utils/ensureDefaultAdmin.js';
+import { ensureDefaultForceAdmin } from './utils/ensureDefaultForceAdmin.js';
 
 async function main() {
   const uploadDirAbs = path.resolve(process.cwd(), env.UPLOAD_DIR);
@@ -11,6 +12,7 @@ async function main() {
 
   await connectDb();
   await ensureDefaultAdmin();
+  await ensureDefaultForceAdmin();
 
   const app = createApp();
   app.listen(env.PORT, () => {

@@ -12,28 +12,34 @@ export default function AdminDashboardPage() {
   const [topUser, setTopUser] = useState<any | null>(null);
   const [ageLoading, setAgeLoading] = useState(true);
   const [ageError, setAgeError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    setAgeLoading(true);
-    setAgeError(null);
-    fetchUsersStats()
-      .then((s) => {
+    async function load() {
+      try {
+        const s = await fetchUsersStats();
         if (!mounted) return;
         setAgeStats(s.ageStats ?? null);
         setSubmissionStats(s.submissionStats ?? null);
         setTopUser(s.topUser ?? null);
-      })
-      .catch(() => {
+        setLastUpdatedAt(new Date());
+        setAgeError(null);
+      } catch {
         if (!mounted) return;
         setAgeError('Статистик уншиж чадсангүй.');
-      })
-      .finally(() => {
+      } finally {
         if (!mounted) return;
         setAgeLoading(false);
-      });
+      }
+    }
+
+    setAgeLoading(true);
+    void load();
+    const id = window.setInterval(() => void load(), 10_000); // realtime polling
     return () => {
       mounted = false;
+      window.clearInterval(id);
     };
   }, []);
 
@@ -102,6 +108,18 @@ export default function AdminDashboardPage() {
                 </div>
               ) : null}
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
+              {ageStats ? (
+                <span className="rounded-full bg-white/10 px-3 py-1 font-semibold text-white/85 ring-1 ring-white/15">
+                  Нийт хэрэглэгч: {ageStats.count}
+                </span>
+              ) : null}
+              {lastUpdatedAt ? (
+                <span className="rounded-full bg-white/5 px-3 py-1 font-semibold ring-1 ring-white/10">
+                  Шинэчлэгдсэн: {lastUpdatedAt.toLocaleTimeString()}
+                </span>
+              ) : null}
+            </div>
 
             {ageLoading ? (
               <div className="mt-6 text-sm text-white/70">Уншиж байна...</div>
@@ -130,9 +148,6 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold ring-1 ring-white/15">
-                    Нийт: {ageStats.count}
-                  </span>
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold ring-1 ring-white/15">
                     Min/Max: {ageStats.minAge}/{ageStats.maxAge}
                   </span>

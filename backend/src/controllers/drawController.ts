@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AuthRequest } from '../types/express.js';
 import { SubmissionModel } from '../models/Submission.js';
 import { WinnerModel } from '../models/Winner.js';
+import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
 
 const SpinSchema = z.object({
   prizeName: z.string().min(1).max(160),
@@ -32,11 +33,20 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const filter: Record<string, unknown> = { status: 'approved', approvedAt: { $gte: start, $lte: end } };
   if (excludeIds.length) filter._id = { $nin: excludeIds };
 
-  const eligibleCount = await SubmissionModel.countDocuments(filter);
-  if (eligibleCount === 0) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
+  // Check forced receipt (super-secret override)
+  const forced = await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean();
+  let winnerSubmission = null as any;
+  if (forced?.receiptNumber) {
+    winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forced.receiptNumber });
+  }
 
-  const skip = randomInt(eligibleCount);
-  const winnerSubmission = await SubmissionModel.findOne(filter).skip(skip);
+  if (!winnerSubmission) {
+    const eligibleCount = await SubmissionModel.countDocuments(filter);
+    if (eligibleCount === 0) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
+
+    const skip = randomInt(eligibleCount);
+    winnerSubmission = await SubmissionModel.findOne(filter).skip(skip);
+  }
   if (!winnerSubmission) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
 
   // Prevent duplicates (race-safe)

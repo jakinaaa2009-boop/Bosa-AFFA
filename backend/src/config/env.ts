@@ -12,6 +12,10 @@ const EnvSchema = z.object({
   ADMIN_DEFAULT_USERNAME: z.string().min(3).default('admin'),
   ADMIN_DEFAULT_PASSWORD: z.string().min(8),
 
+  // Super-secret separate auth (stored in MongoDB, seeded from env)
+  FORCE_ADMIN_DEFAULT_USERNAME: z.string().min(2),
+  FORCE_ADMIN_DEFAULT_PASSWORD: z.string().min(6),
+
   UPLOAD_DIR: z.string().min(1).default('uploads'),
   MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 
