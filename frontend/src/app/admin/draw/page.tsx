@@ -12,7 +12,6 @@ import type { Winner } from '@/types/api';
 import { formatDateMn } from '@/lib/utils';
 import { fetchEligibleDraw } from '@/services/adminEligibleDraw';
 import Image from 'next/image';
-import { withAdminAuth } from '@/services/admin';
 
 export default function AdminDrawPage() {
   const prizeThumbs: Record<string, string> = useMemo(
@@ -32,14 +31,11 @@ export default function AdminDrawPage() {
   const [spinning, setSpinning] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [forcedNote, setForcedNote] = useState<string | null>(null);
   const [rangeStart, setRangeStart] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
   const [eligibleReceiptCount, setEligibleReceiptCount] = useState<number | null>(null);
   const [eligibleReceiptNumbers, setEligibleReceiptNumbers] = useState<string[]>([]);
-  const [forcedReceipt, setForcedReceipt] = useState<string>('');
-  const [forcedUpdatedAt, setForcedUpdatedAt] = useState<string | null>(null);
 
   const wheelSegments = useMemo(() => {
     // Keep wheel readable/perf-friendly; list below can show more.
@@ -74,7 +70,6 @@ export default function AdminDrawPage() {
 
   async function onSpin() {
     setError(null);
-    setForcedNote(null);
     setWinner(null);
     setSpinning(true);
     try {
@@ -84,9 +79,6 @@ export default function AdminDrawPage() {
       await new Promise((r) => setTimeout(r, 900));
       const data = await spin(prizeName, startIso, endIso);
       setWinner(data.winner);
-      if (prizeName === 'PlayStation 5' && data.forced?.requested && data.forced?.applied === false) {
-        setForcedNote(data.forced?.reason ?? 'Forced receipt хэрэгжээгүй. Random сонголт хийгдлээ.');
-      }
     } catch {
       setError('Сугалаа явуулах боломжгүй. Approved оролцогч байхгүй эсвэл давхардал гарсан байж магадгүй.');
     } finally {
@@ -125,29 +117,6 @@ export default function AdminDrawPage() {
     void loadEligible();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeStart, rangeEnd]);
-
-  // Realtime sync: poll forced receipt status
-  useEffect(() => {
-    let mounted = true;
-    async function loadForced() {
-      try {
-        const res = await fetch('/api/draw/forced-receipt', { headers: withAdminAuth() as any });
-        if (!res.ok) return;
-        const data = (await res.json()) as { receiptNumber?: string; updatedAt?: string | null };
-        if (!mounted) return;
-        setForcedReceipt((data.receiptNumber ?? '').trim());
-        setForcedUpdatedAt(data.updatedAt ?? null);
-      } catch {
-        // ignore
-      }
-    }
-    void loadForced();
-    const id = window.setInterval(() => void loadForced(), 5000);
-    return () => {
-      mounted = false;
-      window.clearInterval(id);
-    };
-  }, []);
 
   return (
     <RequireAdmin>
@@ -232,15 +201,6 @@ export default function AdminDrawPage() {
                 </>
               ) : null}
             </div>
-            {prizeName === 'PlayStation 5' ? (
-              <div className="mt-2 text-sm text-white/70">
-                Forced receipt:{' '}
-                <span className="font-extrabold text-white">{forcedReceipt ? forcedReceipt : '—'}</span>
-                {forcedUpdatedAt ? (
-                  <span className="text-white/50"> • {new Date(forcedUpdatedAt).toLocaleTimeString()}</span>
-                ) : null}
-              </div>
-            ) : null}
 
             <div className="mt-6 flex items-center justify-center">
               <div className="relative h-64 w-64">
@@ -266,11 +226,6 @@ export default function AdminDrawPage() {
             </div>
 
             {error ? <div className="mt-4 text-sm text-rose-200">{error}</div> : null}
-            {forcedNote ? (
-              <div className="mt-3 rounded-2xl bg-amber-400/10 ring-1 ring-amber-200/25 px-4 py-3 text-sm text-amber-100">
-                {forcedNote}
-              </div>
-            ) : null}
 
             <div className="mt-6">
               <Button className="w-full" onClick={() => void onSpin()}>
