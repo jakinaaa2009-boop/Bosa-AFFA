@@ -35,6 +35,7 @@ export function ReceiptSection({
 
   const phone = defaults?.phone?.trim() ?? '';
   const fullName = defaults?.fullName?.trim() ?? '';
+  const isCompanyAccount = defaults?.accountType === 'company';
   const productName = productOptions[0] ?? 'Бүтээгдэхүүн 1';
 
   async function refreshList() {
@@ -67,7 +68,9 @@ export function ReceiptSection({
     if (!fullName) return setError('Нэрийн мэдээлэл олдсонгүй. Дахин нэвтэрнэ үү.');
     if (participantType === 'user') {
       if (!receiptNumber.trim()) return setError('Баримтын дугаараа оруулна уу.');
-    } else if (!companyName.trim()) return setError('Компанийн нэрийг оруулна уу.');
+    } else if (!isCompanyAccount && !companyName.trim()) {
+      return setError('Компанийн нэрийг оруулна уу.');
+    }
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum < 0) return setError('Үнийн дүнгээ зөв оруулна уу.');
     if (!receiptFile) {
@@ -76,11 +79,14 @@ export function ReceiptSection({
 
     setLoading(true);
     try {
+      const resolvedCompanyName =
+        participantType === 'company' ? (isCompanyAccount ? fullName : companyName.trim()) : undefined;
+
       await createSubmission({
         productName,
         participantType,
         receiptNumber: participantType === 'user' ? receiptNumber.trim() : undefined,
-        companyName: participantType === 'company' ? companyName.trim() : undefined,
+        companyName: resolvedCompanyName,
         amount: amountNum,
         receiptFile
       });
@@ -150,6 +156,13 @@ export function ReceiptSection({
                         placeholder="Ж: AA00000000"
                       />
                       <div className="text-xs text-white/55">2 латин үсэг + 8 тоо, жишээ нь AA00000000</div>
+                    </Field>
+                  ) : isCompanyAccount ? (
+                    <Field label="Компани">
+                      <div className="flex min-h-12 items-center rounded-2xl bg-white/5 px-4 text-sm font-semibold text-white/90 ring-1 ring-white/15">
+                        {fullName}
+                      </div>
+                      <div className="text-xs text-white/55">Бүртгэлтэй компанийн нэр автоматаар илгээгдэнэ.</div>
                     </Field>
                   ) : (
                     <Field label="Компанийн нэр *">

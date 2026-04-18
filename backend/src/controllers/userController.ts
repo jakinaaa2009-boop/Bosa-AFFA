@@ -13,7 +13,10 @@ export async function usersStats(req: AuthRequest, res: Response) {
     .safeParse(req.query);
   if (!q.success) return res.status(400).json({ message: 'Invalid query' });
 
-  const match: Record<string, unknown> = {};
+  const match: Record<string, unknown> = {
+    // Age/submission stats are for individual participants only.
+    accountType: { $ne: 'company' }
+  };
   if (q.data.search) {
     const s = q.data.search.trim();
     if (s.length) {
@@ -112,6 +115,8 @@ export async function listUsers(req: AuthRequest, res: Response) {
   const q = z
     .object({
       search: z.string().optional(),
+      /** `user` = хувь хүн бүртгэл; `company` = компани бүртгэл */
+      accountType: z.enum(['user', 'company']).default('user'),
       page: z.coerce.number().int().positive().default(1),
       limit: z.coerce.number().int().positive().max(200).default(20)
     })
@@ -119,7 +124,9 @@ export async function listUsers(req: AuthRequest, res: Response) {
 
   if (!q.success) return res.status(400).json({ message: 'Invalid query' });
 
-  const match: Record<string, unknown> = {};
+  const match: Record<string, unknown> =
+    q.data.accountType === 'company' ? { accountType: 'company' } : { accountType: { $ne: 'company' } };
+
   if (q.data.search) {
     const s = q.data.search.trim();
     if (s.length) {

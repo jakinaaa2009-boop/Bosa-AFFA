@@ -31,6 +31,7 @@ export type AdminUserRow = {
   phone: string;
   fullName: string;
   age: number;
+  accountType?: 'user' | 'company';
   totalSubmissions: number;
   approvedSubmissions: number;
   lastSubmittedAt?: string;
@@ -45,7 +46,12 @@ export async function fetchUsersStats(params?: { search?: string }) {
   return res.data;
 }
 
-export async function fetchUsers(params: { search?: string; page?: number; limit?: number }) {
+export async function fetchUsers(params: {
+  search?: string;
+  page?: number;
+  limit?: number;
+  accountType?: 'user' | 'company';
+}) {
   const res = await api.get<{
     items: AdminUserRow[];
     page: number;
