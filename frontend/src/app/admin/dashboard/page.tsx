@@ -83,14 +83,14 @@ export default function AdminDashboardPage() {
           </GlassCard>
           <GlassCard className="p-6">
             <div className="text-xs font-semibold text-white/70">Зөвлөгөө</div>
-            <div className="mt-2 text-sm text-white/75">1) Баримтууд → Approved болгоно</div>
+            <div className="mt-2 text-sm text-white/75">1) Баримтууд → Approved + худалдан авсан барааны тоогоор эрх онооно</div>
             <div className="mt-1 text-sm text-white/75">2) Сугалаа → Шагнал сонгоод Spin</div>
             <div className="mt-1 text-sm text-white/75">3) Ялагчид → Нийтэд харагдана</div>
           </GlassCard>
           <GlassCard className="p-6">
             <div className="text-xs font-semibold text-white/70">Анхаар</div>
             <div className="mt-2 text-sm text-white/75">
-              Нэг submission нэг шагнал дээр дахин ялагч болохгүй (backend хамгаалалттай).
+              Нэг баримт нэг шагнал дээр дахин ялагч болохгүй; олон бараа = олон эрх (жинтэй сугалаа, backend).
             </div>
           </GlassCard>
         </div>

@@ -31,6 +31,7 @@ async function seed() {
         amount: 25000,
         receiptImageBase64: tinyPngBase64,
         receiptImageMime: 'image/png',
+        chances: 1,
         status: 'approved',
         approvedAt: new Date('2026-04-08T10:00:00.000Z')
       },
@@ -43,6 +44,7 @@ async function seed() {
         amount: 18000,
         receiptImageBase64: tinyPngBase64,
         receiptImageMime: 'image/png',
+        chances: null,
         status: 'pending',
         approvedAt: null
       },
@@ -54,6 +56,7 @@ async function seed() {
         amount: 42000,
         receiptImageBase64: tinyPngBase64,
         receiptImageMime: 'image/png',
+        chances: 3,
         status: 'approved',
         approvedAt: new Date('2026-04-12T10:00:00.000Z')
       }

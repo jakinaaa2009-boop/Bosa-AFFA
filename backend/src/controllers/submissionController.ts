@@ -4,6 +4,8 @@ import { SubmissionModel, SubmissionStatus } from '../models/Submission.js';
 import type { AuthRequest } from '../types/express.js';
 import { UserModel } from '../models/User.js';
 import { deleteReceiptFromR2, getReceiptObjectFromR2, uploadReceiptToR2 } from '../services/r2.js';
+import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
+import { effectiveDrawChances } from '../utils/drawChances.js';
 
 const CreateSubmissionPublicSchema = z.object({
   fullName: z.string().min(2).max(120),
@@ -20,6 +22,10 @@ const CreateSubmissionUserSchema = z.object({
   amount: z.coerce.number().min(0)
 });
 
+function isMongoDuplicateKeyError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
+}
+
 export async function createSubmission(req: Request, res: Response) {
   const parsed = CreateSubmissionPublicSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
@@ -28,21 +34,40 @@ export async function createSubmission(req: Request, res: Response) {
   if (!file) return res.status(400).json({ message: 'Receipt image is required' });
   if (!file.buffer) return res.status(400).json({ message: 'Receipt image is required' });
 
+  const receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber);
+  const dup = await SubmissionModel.exists({ receiptNumber });
+  if (dup) {
+    return res.status(409).json({ message: 'This receipt number is already registered' });
+  }
+
   const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
 
-  const submission = await SubmissionModel.create({
-    fullName: parsed.data.fullName,
-    phone: parsed.data.phone,
-    email: parsed.data.email || undefined,
-    productName: parsed.data.productName,
-    receiptNumber: parsed.data.receiptNumber,
-    amount: parsed.data.amount,
-    receiptImageMime: file.mimetype,
-    receiptImageKey: uploaded.key,
-    receiptImageUrl: uploaded.url,
-    status: 'pending',
-    approvedAt: null
-  });
+  let submission;
+  try {
+    submission = await SubmissionModel.create({
+      fullName: parsed.data.fullName,
+      phone: parsed.data.phone,
+      email: parsed.data.email || undefined,
+      productName: parsed.data.productName,
+      receiptNumber,
+      amount: parsed.data.amount,
+      receiptImageMime: file.mimetype,
+      receiptImageKey: uploaded.key,
+      receiptImageUrl: uploaded.url,
+      status: 'pending',
+      approvedAt: null
+    });
+  } catch (err) {
+    if (isMongoDuplicateKeyError(err)) {
+      try {
+        await deleteReceiptFromR2(uploaded.key);
+      } catch {
+        // ignore cleanup failure
+      }
+      return res.status(409).json({ message: 'This receipt number is already registered' });
+    }
+    throw err;
+  }
 
   const submissionObj = submission.toObject() as any;
   const { receiptImageBase64, receiptImageData, receiptImageKey, receiptImageUrl, ...safe } = submissionObj;
@@ -63,20 +88,39 @@ export async function createSubmissionForUser(req: AuthRequest, res: Response) {
   const user = await UserModel.findById(req.user.id).lean();
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
+  const receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber);
+  const dup = await SubmissionModel.exists({ receiptNumber });
+  if (dup) {
+    return res.status(409).json({ message: 'This receipt number is already registered' });
+  }
+
   const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
 
-  const submission = await SubmissionModel.create({
-    fullName: user.fullName,
-    phone: user.phone,
-    productName: parsed.data.productName,
-    receiptNumber: parsed.data.receiptNumber,
-    amount: parsed.data.amount,
-    receiptImageMime: file.mimetype,
-    receiptImageKey: uploaded.key,
-    receiptImageUrl: uploaded.url,
-    status: 'pending',
-    approvedAt: null
-  });
+  let submission;
+  try {
+    submission = await SubmissionModel.create({
+      fullName: user.fullName,
+      phone: user.phone,
+      productName: parsed.data.productName,
+      receiptNumber,
+      amount: parsed.data.amount,
+      receiptImageMime: file.mimetype,
+      receiptImageKey: uploaded.key,
+      receiptImageUrl: uploaded.url,
+      status: 'pending',
+      approvedAt: null
+    });
+  } catch (err) {
+    if (isMongoDuplicateKeyError(err)) {
+      try {
+        await deleteReceiptFromR2(uploaded.key);
+      } catch {
+        // ignore cleanup failure
+      }
+      return res.status(409).json({ message: 'This receipt number is already registered' });
+    }
+    throw err;
+  }
 
   const submissionObj = submission.toObject() as any;
   const { receiptImageBase64, receiptImageData, receiptImageKey, receiptImageUrl, ...safe } = submissionObj;
@@ -231,15 +275,33 @@ export async function patchSubmissionStatus(req: AuthRequest, res: Response) {
   const id = req.params.id;
   const body = z
     .object({
-      status: z.enum(SubmissionStatus)
+      status: z.enum(SubmissionStatus),
+      chances: z.coerce.number().int().min(1).max(10_000).optional()
+    })
+    .superRefine((data, ctx) => {
+      if (data.status === 'approved' && data.chances === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'chances is required when approving (product count = lottery tickets)',
+          path: ['chances']
+        });
+      }
+      if (data.status !== 'approved' && data.chances !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'chances must only be sent when status is approved',
+          path: ['chances']
+        });
+      }
     })
     .safeParse(req.body);
   if (!body.success) return res.status(400).json({ message: 'Invalid payload' });
 
-  const nextApprovedAt = body.data.status === 'approved' ? new Date() : null;
   const updated = await SubmissionModel.findByIdAndUpdate(
     id,
-    { status: body.data.status, approvedAt: nextApprovedAt },
+    body.data.status === 'approved'
+      ? { status: 'approved', approvedAt: new Date(), chances: body.data.chances }
+      : ({ status: body.data.status, approvedAt: null, $unset: { chances: 1 } } as Record<string, unknown>),
     { new: true }
   );
   if (!updated) return res.status(404).json({ message: 'Not found' });
@@ -265,18 +327,26 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     status: 'approved',
     approvedAt: { $gte: start, $lte: end }
   })
-    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0, receiptImageKey: 0, receiptImageUrl: 0 })
+    .select({ receiptNumber: 1, chances: 1 })
     .sort({ approvedAt: -1 })
     .limit(5000)
     .lean();
 
-  // Only expose receipt numbers for wheel list; admin can see details elsewhere.
-  return res.json({
-    items: items.map((s: any) => ({
+  const itemsOut = items
+    .map((s: any) => ({
       id: String(s._id),
-      receiptNumber: s.receiptNumber
-    })),
-    count: items.length
+      receiptNumber: s.receiptNumber,
+      chances: effectiveDrawChances(s)
+    }))
+    .filter((x) => x.chances > 0);
+
+  const totalChances = itemsOut.reduce((sum, x) => sum + x.chances, 0);
+
+  // count = total lottery tickets (weighted pool size); receiptCount = distinct receipts
+  return res.json({
+    items: itemsOut,
+    count: totalChances,
+    receiptCount: itemsOut.length
   });
 }
 

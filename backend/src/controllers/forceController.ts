@@ -8,6 +8,7 @@ import type { AuthRequest } from '../types/express.js';
 import { clearForceCookie, setForceCookie } from '../middleware/forceAuth.js';
 import { ForceAdminModel } from '../models/ForceAdmin.js';
 import { SubmissionModel } from '../models/Submission.js';
+import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
 
 const SecretLoginSchema = z.object({
   username: z.string().min(1),
@@ -53,7 +54,7 @@ export async function setForcedReceipt(req: AuthRequest, res: Response) {
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
 
-  const receiptNumber = parsed.data.receiptNumber;
+  const receiptNumber = parsed.data.receiptNumber ? normalizeReceiptNumber(parsed.data.receiptNumber) : '';
 
   // Strict validation: if set, it must exist as an approved receipt in "Баримт" (submissions).
   // Note: eligible-by-date-range is validated at spin time.

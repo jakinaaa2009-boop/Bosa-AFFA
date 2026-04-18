@@ -4,6 +4,8 @@ import type { AuthRequest } from '../types/express.js';
 import { SubmissionModel } from '../models/Submission.js';
 import { WinnerModel } from '../models/Winner.js';
 import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
+import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
+import { effectiveDrawChances } from '../utils/drawChances.js';
 
 const SpinSchema = z.object({
   prizeName: z.string().min(1).max(160),
@@ -13,6 +15,29 @@ const SpinSchema = z.object({
 
 function randomInt(maxExclusive: number) {
   return Math.floor(Math.random() * maxExclusive);
+}
+
+async function pickWeightedSubmission(filter: Record<string, unknown>) {
+  const rows = await SubmissionModel.find(filter)
+    .select({ _id: 1, fullName: 1, phone: 1, productName: 1, receiptNumber: 1, chances: 1 })
+    .lean();
+
+  const weighted = rows
+    .map((s: any) => ({ doc: s, w: effectiveDrawChances(s) }))
+    .filter((x) => x.w > 0);
+  if (weighted.length === 0) return null;
+
+  // Equivalent to: each submission appears `w` times in a pool, then pick uniformly at random.
+  let total = 0;
+  for (const { w } of weighted) total += w;
+  let r = randomInt(total);
+  for (const { doc, w } of weighted) {
+    if (r < w) return await SubmissionModel.findById(doc._id);
+    r -= w;
+  }
+  const last = weighted[weighted.length - 1];
+  if (!last) return null;
+  return await SubmissionModel.findById(last.doc._id);
 }
 
 export async function spinDraw(req: AuthRequest, res: Response) {
@@ -37,23 +62,24 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const forced =
     prizeName === 'PlayStation 5' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
   let winnerSubmission = null as any;
-  const forcedRequested = (forced?.receiptNumber ?? '').trim();
+  const forcedRequested = forced?.receiptNumber ? normalizeReceiptNumber(forced.receiptNumber) : '';
   let forcedApplied = false;
   let forcedReason: string | null = null;
   if (forcedRequested) {
     winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forcedRequested });
-    if (winnerSubmission) forcedApplied = true;
-    else forcedReason = 'Forced receipt нь сонгосон хугацааны eligible (approved) жагсаалтад байхгүй байна.';
+    const w = winnerSubmission ? effectiveDrawChances(winnerSubmission as any) : 0;
+    if (winnerSubmission && w > 0) forcedApplied = true;
+    else {
+      winnerSubmission = null;
+      forcedReason =
+        'Forced receipt нь сонгосон хугацааны eligible (approved, эрхтэй) жагсаалтад байхгүй эсвэл эрх 0 байна.';
+    }
   }
 
   if (!winnerSubmission) {
-    const eligibleCount = await SubmissionModel.countDocuments(filter);
-    if (eligibleCount === 0) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
-
-    const skip = randomInt(eligibleCount);
-    winnerSubmission = await SubmissionModel.findOne(filter).skip(skip);
+    winnerSubmission = await pickWeightedSubmission(filter);
+    if (!winnerSubmission) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
   }
-  if (!winnerSubmission) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
 
   // Prevent duplicates (race-safe)
   try {

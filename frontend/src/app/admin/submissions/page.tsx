@@ -17,8 +17,15 @@ export default function AdminSubmissionsPage() {
   const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [approveTicketsById, setApproveTicketsById] = useState<Record<string, string>>({});
 
   const apiStatus = useMemo(() => (status === 'all' ? undefined : status), [status]);
+
+  function getApproveTickets(id: string, fallback: number) {
+    const v = approveTicketsById[id];
+    if (v === undefined || v === '') return String(fallback);
+    return v;
+  }
 
   async function load() {
     setLoading(true);
@@ -93,7 +100,9 @@ export default function AdminSubmissionsPage() {
             <div className="text-sm text-white/70">Мэдээлэл алга.</div>
           ) : (
             <div className="grid gap-3">
-              {items.map((s) => (
+              {items.map((s) => {
+                const fallbackTickets = s.status === 'approved' ? (s.chances ?? 1) : 1;
+                return (
                 <div key={s._id} className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-4 sm:p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
@@ -124,19 +133,51 @@ export default function AdminSubmissionsPage() {
                           <span className="text-white/55">Approved:</span>{' '}
                           <span className="font-semibold">{s.approvedAt ? formatDateMn(new Date(s.approvedAt)) : '-'}</span>
                         </div>
+                        {s.status === 'approved' ? (
+                          <div className="text-white/80">
+                            <span className="text-white/55">Сугалааны эрх:</span>{' '}
+                            <span className="font-extrabold text-emerald-200/95">{s.chances ?? 1}</span>
+                            {s.chances == null ? (
+                              <span className="ml-1 text-xs font-semibold text-white/45">(хуучин бүртгэл)</span>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="text-white/80">
                           <span className="text-white/55">Amount:</span>{' '}
                           <span className="font-semibold">{Number(s.amount).toLocaleString()}₮</span>
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
+                          <label htmlFor={`tickets-${s._id}`} className="text-xs font-semibold text-white/70">
+                            Эрх (барааны тоо)
+                          </label>
+                          <input
+                            id={`tickets-${s._id}`}
+                            type="number"
+                            min={1}
+                            max={10000}
+                            inputMode="numeric"
+                            value={getApproveTickets(s._id ?? '', fallbackTickets)}
+                            onChange={(e) => {
+                              if (!s._id) return;
+                              setApproveTicketsById((m) => ({ ...m, [s._id!]: e.target.value }));
+                            }}
+                            className="h-9 w-20 rounded-xl bg-white/10 px-2 text-sm font-bold text-white outline-none ring-1 ring-white/15"
+                          />
+                        </div>
                         <Button
                           size="sm"
                           variant="primary"
                           onClick={async () => {
                             if (!s._id) return;
-                            await setSubmissionStatus(s._id, 'approved');
+                            const n = Number.parseInt(getApproveTickets(s._id, fallbackTickets), 10);
+                            if (!Number.isFinite(n) || n < 1 || n > 10000) {
+                              setError('Эрх 1–10000 хооронд байна.');
+                              return;
+                            }
+                            await setSubmissionStatus(s._id, 'approved', n);
                             await load();
                           }}
                         >
@@ -198,7 +239,8 @@ export default function AdminSubmissionsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

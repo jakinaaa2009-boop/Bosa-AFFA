@@ -18,6 +18,8 @@ export type Submission = {
   amount: number;
   receiptImage: string;
   status: 'pending' | 'approved' | 'rejected';
+  /** Admin-set lottery tickets when approved (= product quantity on receipt). */
+  chances?: number | null;
   approvedAt?: string | null;
   createdAt?: string;
 };

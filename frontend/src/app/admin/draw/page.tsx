@@ -36,6 +36,7 @@ export default function AdminDrawPage() {
   const [rangeStart, setRangeStart] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
+  const [eligibleReceiptCount, setEligibleReceiptCount] = useState<number | null>(null);
   const [eligibleReceiptNumbers, setEligibleReceiptNumbers] = useState<string[]>([]);
   const [forcedReceipt, setForcedReceipt] = useState<string>('');
   const [forcedUpdatedAt, setForcedUpdatedAt] = useState<string | null>(null);
@@ -96,13 +97,25 @@ export default function AdminDrawPage() {
   async function loadEligible() {
     setError(null);
     setEligibleCount(null);
+    setEligibleReceiptCount(null);
     setEligibleReceiptNumbers([]);
     try {
       const startIso = new Date(`${rangeStart}T00:00:00.000Z`).toISOString();
       const endIso = new Date(`${rangeEnd}T23:59:59.999Z`).toISOString();
       const data = await fetchEligibleDraw({ startDate: startIso, endDate: endIso });
-      setEligibleCount(data.count ?? data.items.length);
-      setEligibleReceiptNumbers(data.items.map((x) => x.receiptNumber).slice(0, 80));
+      setEligibleCount(data.count ?? 0);
+      setEligibleReceiptCount(data.receiptCount ?? data.items.length);
+      const expanded: string[] = [];
+      const cap = 500;
+      for (const it of data.items) {
+        const n = Math.min(Math.max(0, it.chances), 10_000);
+        for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.receiptNumber);
+      }
+      for (let i = expanded.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [expanded[i], expanded[j]] = [expanded[j], expanded[i]];
+      }
+      setEligibleReceiptNumbers(expanded.slice(0, 80));
     } catch {
       setError('Eligible жагсаалтыг уншиж чадсангүй.');
     }
@@ -208,10 +221,16 @@ export default function AdminDrawPage() {
             <div className="text-sm font-extrabold tracking-tight">Эргүүлэх хүрд</div>
             <div className="mt-2 text-sm text-white/70">
               Зөвхөн <span className="font-semibold text-white/85">approved</span> бөгөөд сонгосон огнооны хүрээнд
-              баталгаажсан баримтуудаас санамсаргүйгээр сонгоно.
+              баталгаажсан баримтуудаас сонгоно. Нэг бараанд нэг эрх: олон бараа = олон эрх (жинтэй санамсаргүй).
             </div>
             <div className="mt-3 text-sm text-white/70">
-              Eligible: <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
+              Нийт эрх (pool): <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
+              {eligibleReceiptCount != null ? (
+                <>
+                  {' '}
+                  · Баримтын тоо: <span className="font-semibold text-white/85">{eligibleReceiptCount}</span>
+                </>
+              ) : null}
             </div>
             {prizeName === 'PlayStation 5' ? (
               <div className="mt-2 text-sm text-white/70">
@@ -240,7 +259,7 @@ export default function AdminDrawPage() {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 py-3 text-center">
                     <div className="text-xs font-semibold text-white/70">Wheel entry</div>
-                    <div className="mt-1 text-sm font-extrabold">Баримтын дугаар</div>
+                    <div className="mt-1 text-sm font-extrabold">Эрхийн жин</div>
                   </div>
                 </div>
               </div>
@@ -272,7 +291,7 @@ export default function AdminDrawPage() {
               <div className="mt-6 rounded-3xl bg-[radial-gradient(600px_240px_at_20%_0%,rgba(56,189,248,0.20),transparent_60%)] bg-white/5 ring-1 ring-white/10 p-6">
                 <div className="text-xs font-semibold text-white/70">Ялагч</div>
                 <div className="mt-1 text-2xl font-extrabold tracking-tight">{winner.receiptNumber ?? '—'}</div>
-                <div className="mt-1 text-sm text-white/70">Баримтын дугаар</div>
+                <div className="mt-1 text-sm text-white/70">Баримтын дугаар (ялагч)</div>
                 <div className="mt-1 text-xl font-extrabold tracking-tight">{winner.winnerName}</div>
                 <div className="mt-4 grid gap-1 text-sm text-white/80">
                   <div>
@@ -292,7 +311,7 @@ export default function AdminDrawPage() {
 
             <div className="mt-6">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-extrabold tracking-tight">Оролцогчид (receipt #)</div>
+                <div className="text-sm font-extrabold tracking-tight">Pool (жишээ — баримтын № давтагдсан = олон эрх)</div>
                 <Button size="sm" variant="secondary" onClick={() => void loadEligible()}>
                   Дахин унших
                 </Button>
@@ -302,17 +321,17 @@ export default function AdminDrawPage() {
                   <div className="text-sm text-white/70">Мэдээлэл алга.</div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {eligibleReceiptNumbers.map((n) => (
+                    {eligibleReceiptNumbers.map((n, idx) => (
                       <span
-                        key={n}
+                        key={`${n}-${idx}`}
                         className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/85 ring-1 ring-white/15"
                       >
                         {n}
                       </span>
                     ))}
-                    {eligibleCount && eligibleCount > eligibleReceiptNumbers.length ? (
+                    {eligibleCount != null && eligibleCount > eligibleReceiptNumbers.length ? (
                       <span className="text-xs text-white/60 self-center">
-                        +{eligibleCount - eligibleReceiptNumbers.length} өөр
+                        +{eligibleCount - eligibleReceiptNumbers.length} эрх (хүрдэнд бүгдийг нь харуулаагүй)
                       </span>
                     ) : null}
                   </div>

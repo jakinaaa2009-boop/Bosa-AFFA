@@ -17,10 +17,16 @@ export async function fetchSubmissions(params: {
   return res.data;
 }
 
-export async function setSubmissionStatus(id: string, status: 'pending' | 'approved' | 'rejected') {
+export async function setSubmissionStatus(
+  id: string,
+  status: 'pending' | 'approved' | 'rejected',
+  chances?: number
+) {
+  const body: { status: typeof status; chances?: number } = { status };
+  if (status === 'approved' && chances !== undefined) body.chances = chances;
   const res = await api.patch<{ submission: Submission }>(
     `/api/submissions/${id}/status`,
-    { status },
+    body,
     { headers: withAdminAuth() }
   );
   return res.data.submission;

@@ -19,6 +19,8 @@ export type SubmissionDoc = {
   receiptImageData?: Buffer;
   receiptImageMime: string;
   status: SubmissionStatusType;
+  /** Admin-assigned lottery tickets (= purchased product count) when approved. */
+  chances?: number | null;
   approvedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +33,14 @@ const SubmissionSchema = new Schema<SubmissionDoc>(
     phone: { type: String, required: true, trim: true, minlength: 6, maxlength: 32 },
     email: { type: String, required: false, trim: true, maxlength: 160 },
     productName: { type: String, required: true, trim: true, maxlength: 120 },
-    receiptNumber: { type: String, required: true, trim: true, minlength: 5, maxlength: 64, index: true },
+    receiptNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 5,
+      maxlength: 64,
+      unique: true
+    },
     amount: { type: Number, required: true, min: 0 },
     receiptImageKey: { type: String, required: false, trim: true, maxlength: 512 },
     receiptImageUrl: { type: String, required: false, trim: true, maxlength: 2048 },
@@ -39,6 +48,7 @@ const SubmissionSchema = new Schema<SubmissionDoc>(
     receiptImageData: { type: Buffer, required: false },
     receiptImageMime: { type: String, required: true, trim: true, maxlength: 64 },
     status: { type: String, enum: SubmissionStatus, default: 'pending', index: true },
+    chances: { type: Number, required: false, default: null },
     approvedAt: { type: Date, required: false, default: null, index: true }
   },
   { timestamps: true }

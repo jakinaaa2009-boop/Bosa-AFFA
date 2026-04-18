@@ -58,7 +58,7 @@ Backend: `http://localhost:5000`
 - **Admin**
   - `POST /api/admin/login`
   - `GET /api/submissions` (JWT шаардлагатай)
-  - `PATCH /api/submissions/:id/status`
+  - `PATCH /api/submissions/:id/status` (`approved` үед `chances` — худалдан авсан барааны тоо = сугалааны эрхийн тоо)
   - `DELETE /api/submissions/:id`
   - `POST /api/draw/spin`
 
