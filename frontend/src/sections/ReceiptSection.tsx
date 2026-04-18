@@ -7,7 +7,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { PRODUCTS } from '@/lib/constants';
 import { createSubmission, fetchMySubmissions } from '@/services/submissions';
-import type { Submission } from '@/types/api';
+import type { ParticipantType, Submission } from '@/types/api';
 import { resolveReceiptImage } from '@/lib/assets';
 import { formatDateMn } from '@/lib/utils';
 
@@ -18,7 +18,9 @@ export function ReceiptSection({
 }) {
   const productOptions = useMemo(() => PRODUCTS.map((p) => p.name), []);
 
+  const [participantType, setParticipantType] = useState<ParticipantType>('user');
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
@@ -58,21 +60,28 @@ export function ReceiptSection({
 
     if (!phone) return setError('Нэвтэрсний дараа баримт илгээнэ үү.');
     if (!fullName) return setError('Нэрийн мэдээлэл олдсонгүй. Дахин нэвтэрнэ үү.');
-    if (!receiptNumber.trim()) return setError('Баримтын дугаараа оруулна уу.');
+    if (participantType === 'user') {
+      if (!receiptNumber.trim()) return setError('Баримтын дугаараа оруулна уу.');
+    } else if (!companyName.trim()) return setError('Компанийн нэрийг оруулна уу.');
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum < 0) return setError('Үнийн дүнгээ зөв оруулна уу.');
-    if (!receiptFile) return setError('Баримтын зургийг оруулна уу.');
+    if (!receiptFile) {
+      return setError(participantType === 'user' ? 'Баримтын зургийг оруулна уу.' : 'Бүтээгдэхүүний зургийг оруулна уу.');
+    }
 
     setLoading(true);
     try {
       await createSubmission({
         productName,
-        receiptNumber: receiptNumber.trim(),
+        participantType,
+        receiptNumber: participantType === 'user' ? receiptNumber.trim() : undefined,
+        companyName: participantType === 'company' ? companyName.trim() : undefined,
         amount: amountNum,
         receiptFile
       });
-      setSuccess('Амжилттай илгээлээ. Баримт шалгагдсаны дараа баталгаажина.');
+      setSuccess('Амжилттай илгээлээ. Шалгагдсаны дараа баталгаажина.');
       setReceiptNumber('');
+      setCompanyName('');
       setAmount('');
       setReceiptFile(null);
       await refreshList();
@@ -87,9 +96,9 @@ export function ReceiptSection({
     <section id="receipt" className="px-5 py-12 sm:py-16">
       <div className="mx-auto max-w-5xl">
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Баримт оруулах</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Баримт бүртгэх</h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
-            Мэдээллээ бөглөөд НӨАТ-ын баримтын зургаа хавсаргана уу.
+            Хувь хүн: eBarimt баримт. Компани: савлагаа / боодлын зураг (баримтын дугаар шаардлагагүй).
           </p>
         </div>
 
@@ -97,16 +106,56 @@ export function ReceiptSection({
           <GlassCard className="p-6 sm:p-8">
             <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
               <form onSubmit={onSubmit} className="grid gap-5">
+                <div className="grid gap-2">
+                  <span className="text-xs font-semibold text-white/70">Оролцогчийн төрөл *</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        { v: 'user' as const, label: 'Хэрэглэгч' },
+                        { v: 'company' as const, label: 'Компани' }
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => {
+                          setParticipantType(opt.v);
+                          setError(null);
+                        }}
+                        className={[
+                          'rounded-full px-4 py-2 text-sm font-extrabold ring-1 transition',
+                          participantType === opt.v
+                            ? 'bg-white text-slate-900 ring-white'
+                            : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                        ].join(' ')}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Баримтын дугаар *">
-                    <input
-                      value={receiptNumber}
-                      onChange={(e) => setReceiptNumber(e.target.value)}
-                      className="h-12 w-full rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white placeholder:text-white/40 outline-none focus:ring-sky-300/60"
-                      placeholder="Ж: AA00000000"
-                    />
-                    <div className="text-xs text-white/55">2 латин үсэг + 8 тоо, жишээ нь AA00000000</div>
-                  </Field>
+                  {participantType === 'user' ? (
+                    <Field label="Баримтын дугаар *">
+                      <input
+                        value={receiptNumber}
+                        onChange={(e) => setReceiptNumber(e.target.value)}
+                        className="h-12 w-full rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white placeholder:text-white/40 outline-none focus:ring-sky-300/60"
+                        placeholder="Ж: AA00000000"
+                      />
+                      <div className="text-xs text-white/55">2 латин үсэг + 8 тоо, жишээ нь AA00000000</div>
+                    </Field>
+                  ) : (
+                    <Field label="Компанийн нэр *">
+                      <input
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        className="h-12 w-full rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white placeholder:text-white/40 outline-none focus:ring-sky-300/60"
+                        placeholder="Ж: Bosa LLC"
+                      />
+                    </Field>
+                  )}
                   <Field label="Үнийн дүн (₮) *">
                     <input
                       value={amount}
@@ -119,7 +168,9 @@ export function ReceiptSection({
                 </div>
 
                 <div className="grid gap-2">
-                  <label className="text-xs font-semibold text-white/70">НӨАТ-ын баримтын зураг *</label>
+                  <label className="text-xs font-semibold text-white/70">
+                    {participantType === 'user' ? 'НӨАТ-ын баримтын зураг *' : 'Бүтээгдэхүүний зураг (савлагаа) *'}
+                  </label>
                   <label className="group cursor-pointer rounded-3xl border border-dashed border-white/25 bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/8 transition">
                     <input
                       type="file"
@@ -190,7 +241,10 @@ export function ReceiptSection({
             ) : (
               <div className="grid gap-3">
                 {(showAll ? items : items.slice(0, 6)).map((s) => (
-                  <GlassCard key={s._id ?? `${s.receiptNumber}-${s.createdAt}`} className="p-4 sm:p-5">
+                  <GlassCard
+                    key={s._id ?? `${s.receiptNumber ?? s.companyName}-${s.createdAt}`}
+                    className="p-4 sm:p-5"
+                  >
                     <div className="flex items-center gap-4">
                       <button
                         type="button"
@@ -212,7 +266,12 @@ export function ReceiptSection({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="truncate text-sm font-extrabold text-white">{s.receiptNumber}</div>
+                          <div className="truncate text-sm font-extrabold text-white">
+                            {s.participantType === 'company' ? s.companyName || s.fullName : s.receiptNumber || '—'}
+                          </div>
+                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/15">
+                            {s.participantType === 'company' ? 'Компани' : 'Хэрэглэгч'}
+                          </span>
                           <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/15">
                             {s.status}
                           </span>
@@ -258,7 +317,11 @@ export function ReceiptSection({
               <GlassCard className="p-4 sm:p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-base font-extrabold text-white">{preview.receiptNumber}</div>
+                    <div className="text-base font-extrabold text-white">
+                      {preview.participantType === 'company'
+                        ? preview.companyName || preview.fullName
+                        : preview.receiptNumber}
+                    </div>
                     <div className="mt-1 text-sm text-white/70">
                       {preview.amount.toLocaleString()}₮ · {preview.status}
                     </div>

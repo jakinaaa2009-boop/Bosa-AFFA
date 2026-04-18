@@ -1,10 +1,13 @@
 import { api } from './api';
 import { withAdminAuth } from './admin';
+import type { ParticipantType } from '@/types/api';
 
 export type EligibleDrawItem = {
   id?: string;
   _id?: string;
-  receiptNumber: string;
+  receiptNumber?: string;
+  displayLabel: string;
+  participantType?: ParticipantType;
   chances: number;
 };
 

@@ -68,9 +68,11 @@ export function WinnersSection() {
                   <GlassCard className="p-6 relative overflow-hidden">
                     <div className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(500px_220px_at_20%_0%,rgba(56,189,248,0.20),transparent_60%)]" />
                     <div className="relative">
-                      <div className="text-xs font-semibold text-white/70">Баримтын дугаар</div>
+                      <div className="text-xs font-semibold text-white/70">
+                        {w.participantType === 'company' ? 'Компани' : 'Баримтын дугаар'}
+                      </div>
                       <div className="mt-1 text-base font-extrabold tracking-tight text-white">
-                        {w.receiptNumber ?? '—'}
+                        {w.displayLabel ?? w.receiptNumber ?? w.companyName ?? w.winnerName ?? '—'}
                       </div>
                       <div className="mt-4 grid gap-1 text-sm text-white/75">
                         <div>

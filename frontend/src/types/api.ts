@@ -1,6 +1,12 @@
+export type ParticipantType = 'user' | 'company';
+
 export type Winner = {
   _id?: string;
   receiptNumber?: string;
+  companyName?: string;
+  participantType?: ParticipantType;
+  /** Primary label for draw UI (receipt # or company name). */
+  displayLabel?: string;
   winnerName: string;
   phone: string;
   productName: string;
@@ -14,7 +20,9 @@ export type Submission = {
   phone: string;
   email?: string;
   productName: string;
-  receiptNumber: string;
+  participantType?: ParticipantType;
+  receiptNumber?: string;
+  companyName?: string;
   amount: number;
   receiptImage: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -23,4 +31,3 @@ export type Submission = {
   approvedAt?: string | null;
   createdAt?: string;
 };
-

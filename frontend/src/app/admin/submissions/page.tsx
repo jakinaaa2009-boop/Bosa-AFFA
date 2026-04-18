@@ -10,9 +10,11 @@ import { resolveReceiptImage } from '@/lib/assets';
 import { formatDateMn } from '@/lib/utils';
 
 type Status = 'pending' | 'approved' | 'rejected' | 'all';
+type SubmitterTab = 'all' | 'user' | 'company';
 
 export default function AdminSubmissionsPage() {
   const [status, setStatus] = useState<Status>('all');
+  const [submitterTab, setSubmitterTab] = useState<SubmitterTab>('all');
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,10 @@ export default function AdminSubmissionsPage() {
   const [approveTicketsById, setApproveTicketsById] = useState<Record<string, string>>({});
 
   const apiStatus = useMemo(() => (status === 'all' ? undefined : status), [status]);
+  const apiParticipantType = useMemo(
+    () => (submitterTab === 'all' ? undefined : submitterTab),
+    [submitterTab]
+  );
 
   function getApproveTickets(id: string, fallback: number) {
     const v = approveTicketsById[id];
@@ -31,7 +37,12 @@ export default function AdminSubmissionsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchSubmissions({ status: apiStatus, search: search.trim() || undefined, limit: 50 });
+      const data = await fetchSubmissions({
+        status: apiStatus,
+        participantType: apiParticipantType,
+        search: search.trim() || undefined,
+        limit: 50
+      });
       setItems(data.items);
     } catch {
       setError('Баримтуудыг уншиж чадсангүй.');
@@ -43,7 +54,7 @@ export default function AdminSubmissionsPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, submitterTab]);
 
   return (
     <RequireAdmin>
@@ -55,6 +66,25 @@ export default function AdminSubmissionsPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-xs font-semibold text-white/70">Төрөл</label>
+              <select
+                value={submitterTab}
+                onChange={(e) => setSubmitterTab(e.target.value as SubmitterTab)}
+                className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
+              >
+                <option value="all" className="text-slate-900">
+                  Бүгд
+                </option>
+                <option value="user" className="text-slate-900">
+                  Хэрэглэгч
+                </option>
+                <option value="company" className="text-slate-900">
+                  Компани
+                </option>
+              </select>
+            </div>
+
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-white/70">Статус</label>
               <select
@@ -81,7 +111,7 @@ export default function AdminSubmissionsPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Нэр/утас/бүтээгдэхүүн/баримтын №..."
+                placeholder="Нэр/утас/компани/бүтээгдэхүүн/баримтын №..."
                 className="h-10 w-full sm:w-64 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white placeholder:text-white/40 outline-none"
               />
               <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -106,8 +136,11 @@ export default function AdminSubmissionsPage() {
                 <div key={s._id} className="rounded-3xl bg-white/5 ring-1 ring-white/10 p-4 sm:p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                         <div className="text-base font-extrabold tracking-tight text-white truncate">{s.fullName}</div>
+                        <span className="inline-flex rounded-full bg-sky-400/15 px-3 py-1 text-xs font-semibold text-sky-100 ring-1 ring-sky-300/30">
+                          {s.participantType === 'company' ? 'Компани' : 'Хэрэглэгч'}
+                        </span>
                         <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15">
                           {s.status}
                         </span>
@@ -121,10 +154,17 @@ export default function AdminSubmissionsPage() {
                           <span className="text-white/55">Product:</span>{' '}
                           <span className="font-semibold">{s.productName}</span>
                         </div>
-                        <div className="text-white/85">
-                          <span className="text-white/55">Receipt #:</span>{' '}
-                          <span className="font-extrabold">{s.receiptNumber}</span>
-                        </div>
+                        {s.participantType === 'company' ? (
+                          <div className="text-white/85">
+                            <span className="text-white/55">Компани:</span>{' '}
+                            <span className="font-extrabold">{s.companyName || s.fullName}</span>
+                          </div>
+                        ) : (
+                          <div className="text-white/85">
+                            <span className="text-white/55">Receipt #:</span>{' '}
+                            <span className="font-extrabold">{s.receiptNumber ?? '—'}</span>
+                          </div>
+                        )}
                         <div className="text-white/70">
                           <span className="text-white/55">Created:</span>{' '}
                           <span className="font-semibold">{s.createdAt ? formatDateMn(new Date(s.createdAt)) : '-'}</span>

@@ -16,7 +16,11 @@ export async function listWinners(_req: Request, res: Response) {
     },
     {
       $addFields: {
-        receiptNumber: { $ifNull: ['$receiptNumber', { $first: '$sub.receiptNumber' }] }
+        receiptNumber: { $ifNull: ['$receiptNumber', { $first: '$sub.receiptNumber' }] },
+        participantType: {
+          $ifNull: ['$participantType', { $ifNull: [{ $first: '$sub.participantType' }, 'user'] }]
+        },
+        companyName: { $ifNull: ['$companyName', { $first: '$sub.companyName' }] }
       }
     },
     { $project: { sub: 0 } }

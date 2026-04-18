@@ -6,21 +6,46 @@ import { UserModel } from '../models/User.js';
 import { deleteReceiptFromR2, getReceiptObjectFromR2, uploadReceiptToR2 } from '../services/r2.js';
 import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
 import { effectiveDrawChances } from '../utils/drawChances.js';
+import { submissionPoolLabel } from '../utils/submissionDisplay.js';
 
-const CreateSubmissionPublicSchema = z.object({
-  fullName: z.string().min(2).max(120),
-  phone: z.string().min(6).max(32),
-  email: z.string().email().optional().or(z.literal('')),
-  productName: z.string().min(1).max(120),
-  receiptNumber: z.string().min(5).max(64),
-  amount: z.coerce.number().min(0)
-});
+const CreateSubmissionPublicSchema = z
+  .object({
+    fullName: z.string().min(2).max(120),
+    phone: z.string().min(6).max(32),
+    email: z.string().email().optional().or(z.literal('')),
+    productName: z.string().min(1).max(120),
+    amount: z.coerce.number().min(0),
+    participantType: z.enum(['user', 'company']).default('user'),
+    receiptNumber: z.string().optional(),
+    companyName: z.string().optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.participantType === 'user') {
+      if (!data.receiptNumber?.trim() || data.receiptNumber.trim().length < 5) {
+        ctx.addIssue({ code: 'custom', message: 'receiptNumber required', path: ['receiptNumber'] });
+      }
+    } else if (!data.companyName?.trim() || data.companyName.trim().length < 2) {
+      ctx.addIssue({ code: 'custom', message: 'companyName required', path: ['companyName'] });
+    }
+  });
 
-const CreateSubmissionUserSchema = z.object({
-  productName: z.string().min(1).max(120),
-  receiptNumber: z.string().min(5).max(64),
-  amount: z.coerce.number().min(0)
-});
+const CreateSubmissionUserSchema = z
+  .object({
+    productName: z.string().min(1).max(120),
+    amount: z.coerce.number().min(0),
+    participantType: z.enum(['user', 'company']).default('user'),
+    receiptNumber: z.string().optional(),
+    companyName: z.string().optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.participantType === 'user') {
+      if (!data.receiptNumber?.trim() || data.receiptNumber.trim().length < 5) {
+        ctx.addIssue({ code: 'custom', message: 'receiptNumber required', path: ['receiptNumber'] });
+      }
+    } else if (!data.companyName?.trim() || data.companyName.trim().length < 2) {
+      ctx.addIssue({ code: 'custom', message: 'companyName required', path: ['companyName'] });
+    }
+  });
 
 function isMongoDuplicateKeyError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
@@ -31,25 +56,34 @@ export async function createSubmission(req: Request, res: Response) {
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
 
   const file = (req as Request & { file?: Express.Multer.File }).file;
-  if (!file) return res.status(400).json({ message: 'Receipt image is required' });
-  if (!file.buffer) return res.status(400).json({ message: 'Receipt image is required' });
+  if (!file) return res.status(400).json({ message: 'Image is required' });
+  if (!file.buffer) return res.status(400).json({ message: 'Image is required' });
 
-  const receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber);
-  const dup = await SubmissionModel.exists({ receiptNumber });
-  if (dup) {
-    return res.status(409).json({ message: 'This receipt number is already registered' });
+  const isUser = parsed.data.participantType === 'user';
+  let receiptNumber: string | undefined;
+  if (isUser) {
+    receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber!);
+    const dup = await SubmissionModel.exists({ receiptNumber });
+    if (dup) {
+      return res.status(409).json({ message: 'This receipt number is already registered' });
+    }
   }
 
   const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
 
+  const companyName = !isUser ? parsed.data.companyName!.trim() : undefined;
+  const displayName = isUser ? parsed.data.fullName : companyName!;
+
   let submission;
   try {
     submission = await SubmissionModel.create({
-      fullName: parsed.data.fullName,
+      fullName: displayName,
       phone: parsed.data.phone,
       email: parsed.data.email || undefined,
       productName: parsed.data.productName,
+      participantType: parsed.data.participantType,
       receiptNumber,
+      companyName,
       amount: parsed.data.amount,
       receiptImageMime: file.mimetype,
       receiptImageKey: uploaded.key,
@@ -83,26 +117,35 @@ export async function createSubmissionForUser(req: AuthRequest, res: Response) {
   if (!parsed.success) return res.status(400).json({ message: 'Invalid payload' });
 
   const file = (req as Request & { file?: Express.Multer.File }).file;
-  if (!file?.buffer) return res.status(400).json({ message: 'Receipt image is required' });
+  if (!file?.buffer) return res.status(400).json({ message: 'Image is required' });
 
   const user = await UserModel.findById(req.user.id).lean();
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
-  const receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber);
-  const dup = await SubmissionModel.exists({ receiptNumber });
-  if (dup) {
-    return res.status(409).json({ message: 'This receipt number is already registered' });
+  const isUser = parsed.data.participantType === 'user';
+  let receiptNumber: string | undefined;
+  if (isUser) {
+    receiptNumber = normalizeReceiptNumber(parsed.data.receiptNumber!);
+    const dup = await SubmissionModel.exists({ receiptNumber });
+    if (dup) {
+      return res.status(409).json({ message: 'This receipt number is already registered' });
+    }
   }
 
   const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
 
+  const companyName = !isUser ? parsed.data.companyName!.trim() : undefined;
+  const displayName = isUser ? user.fullName : companyName!;
+
   let submission;
   try {
     submission = await SubmissionModel.create({
-      fullName: user.fullName,
+      fullName: displayName,
       phone: user.phone,
       productName: parsed.data.productName,
+      participantType: parsed.data.participantType,
       receiptNumber,
+      companyName,
       amount: parsed.data.amount,
       receiptImageMime: file.mimetype,
       receiptImageKey: uploaded.key,
@@ -171,6 +214,7 @@ export async function listSubmissions(req: AuthRequest, res: Response) {
   const q = z
     .object({
       status: z.enum(SubmissionStatus).optional(),
+      participantType: z.enum(['user', 'company', 'all']).optional(),
       search: z.string().optional(),
       page: z.coerce.number().int().positive().default(1),
       limit: z.coerce.number().int().positive().max(200).default(20)
@@ -181,17 +225,30 @@ export async function listSubmissions(req: AuthRequest, res: Response) {
 
   const filter: Record<string, unknown> = {};
   if (q.data.status) filter.status = q.data.status;
+
+  const andClauses: Record<string, unknown>[] = [];
+  if (q.data.participantType && q.data.participantType !== 'all') {
+    if (q.data.participantType === 'company') {
+      andClauses.push({ participantType: 'company' });
+    } else {
+      andClauses.push({ $or: [{ participantType: 'user' }, { participantType: { $exists: false } }] });
+    }
+  }
   if (q.data.search) {
     const s = q.data.search.trim();
     if (s.length) {
-      filter.$or = [
-        { fullName: { $regex: s, $options: 'i' } },
-        { phone: { $regex: s, $options: 'i' } },
-        { productName: { $regex: s, $options: 'i' } },
-        { receiptNumber: { $regex: s, $options: 'i' } }
-      ];
+      andClauses.push({
+        $or: [
+          { fullName: { $regex: s, $options: 'i' } },
+          { phone: { $regex: s, $options: 'i' } },
+          { productName: { $regex: s, $options: 'i' } },
+          { receiptNumber: { $regex: s, $options: 'i' } },
+          { companyName: { $regex: s, $options: 'i' } }
+        ]
+      });
     }
   }
+  if (andClauses.length) filter.$and = andClauses;
 
   const skip = (q.data.page - 1) * q.data.limit;
   const [itemsRaw, total] = await Promise.all([
@@ -327,7 +384,7 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     status: 'approved',
     approvedAt: { $gte: start, $lte: end }
   })
-    .select({ receiptNumber: 1, chances: 1 })
+    .select({ receiptNumber: 1, chances: 1, participantType: 1, companyName: 1, fullName: 1 })
     .sort({ approvedAt: -1 })
     .limit(5000)
     .lean();
@@ -336,6 +393,8 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     .map((s: any) => ({
       id: String(s._id),
       receiptNumber: s.receiptNumber,
+      participantType: s.participantType ?? 'user',
+      displayLabel: submissionPoolLabel(s),
       chances: effectiveDrawChances(s)
     }))
     .filter((x) => x.chances > 0);

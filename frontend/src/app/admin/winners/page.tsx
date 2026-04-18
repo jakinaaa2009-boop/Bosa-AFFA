@@ -54,6 +54,11 @@ export default function AdminWinnersPage() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="text-base font-extrabold tracking-tight text-white truncate">{w.winnerName}</div>
+                      <div className="mt-1 text-xs font-semibold text-white/55">
+                        {w.participantType === 'company'
+                          ? `Компани · ${w.displayLabel ?? w.companyName ?? '—'}`
+                          : `Баримт · ${w.displayLabel ?? w.receiptNumber ?? '—'}`}
+                      </div>
                       <div className="mt-1 text-sm text-white/75">
                         <span className="text-white/60">Шагнал:</span> <span className="font-semibold">{w.prizeName}</span>
                       </div>

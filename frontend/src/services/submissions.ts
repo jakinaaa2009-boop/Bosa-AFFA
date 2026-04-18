@@ -3,16 +3,23 @@ import { userAuthHeaders } from './userSession';
 
 export type CreateSubmissionInput = {
   productName: string;
-  receiptNumber: string;
   amount: number;
   receiptFile: File;
+  participantType: 'user' | 'company';
+  receiptNumber?: string;
+  companyName?: string;
 };
 
 export async function createSubmission(input: CreateSubmissionInput) {
   const fd = new FormData();
   fd.append('productName', input.productName);
-  fd.append('receiptNumber', input.receiptNumber);
   fd.append('amount', String(input.amount));
+  fd.append('participantType', input.participantType);
+  if (input.participantType === 'user') {
+    fd.append('receiptNumber', input.receiptNumber ?? '');
+  } else {
+    fd.append('companyName', input.companyName ?? '');
+  }
   fd.append('receiptImage', input.receiptFile);
 
   const res = await api.post('/api/submissions/me', fd, {

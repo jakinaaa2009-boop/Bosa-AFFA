@@ -4,6 +4,7 @@ import type { Submission } from '@/types/api';
 
 export async function fetchSubmissions(params: {
   status?: 'pending' | 'approved' | 'rejected';
+  participantType?: 'user' | 'company' | 'all';
   search?: string;
   page?: number;
   limit?: number;

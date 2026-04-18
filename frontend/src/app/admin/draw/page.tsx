@@ -14,7 +14,7 @@ import { fetchEligibleDraw } from '@/services/adminEligibleDraw';
 import type { EligibleDrawItem } from '@/services/adminEligibleDraw';
 import Image from 'next/image';
 
-type PoolEntry = { id: string; receiptNumber: string; chances: number };
+type PoolEntry = { id: string; displayLabel: string; chances: number };
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -53,7 +53,7 @@ export default function AdminDrawPage() {
     const cap = 500;
     for (const it of poolEntries) {
       const n = Math.min(Math.max(0, it.chances), 10_000);
-      for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.receiptNumber);
+      for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.displayLabel);
     }
     shuffleInPlace(expanded);
     return expanded.slice(0, 24);
@@ -117,18 +117,19 @@ export default function AdminDrawPage() {
       const entries: PoolEntry[] = (data.items as EligibleDrawItem[])
         .map((it, idx) => {
           const rawId = it.id ?? it._id;
+          const label = it.displayLabel || it.receiptNumber || `оролцогч-${idx}`;
           const id =
             rawId != null && String(rawId).trim() !== ''
               ? String(rawId)
-              : `pool-${idx}-${it.receiptNumber}`;
+              : `pool-${idx}-${label}`;
           return {
             id,
-            receiptNumber: it.receiptNumber,
+            displayLabel: label,
             chances: Math.min(Math.max(0, it.chances), 10_000)
           };
         })
         .filter((x) => x.chances > 0)
-        .sort((a, b) => b.chances - a.chances || a.receiptNumber.localeCompare(b.receiptNumber));
+        .sort((a, b) => b.chances - a.chances || a.displayLabel.localeCompare(b.displayLabel));
       setPoolEntries(entries);
     } catch {
       setError('Eligible жагсаалтыг уншиж чадсангүй.');
@@ -280,8 +281,16 @@ export default function AdminDrawPage() {
             ) : (
               <div className="mt-6 rounded-3xl bg-[radial-gradient(600px_240px_at_20%_0%,rgba(56,189,248,0.20),transparent_60%)] bg-white/5 ring-1 ring-white/10 p-6">
                 <div className="text-xs font-semibold text-white/70">Ялагч</div>
-                <div className="mt-1 text-2xl font-extrabold tracking-tight">{winner.receiptNumber ?? '—'}</div>
-                <div className="mt-1 text-sm text-white/70">Баримтын дугаар (ялагч)</div>
+                <div className="mt-1 text-2xl font-extrabold tracking-tight">
+                  {winner.displayLabel ??
+                    winner.receiptNumber ??
+                    winner.companyName ??
+                    winner.winnerName ??
+                    '—'}
+                </div>
+                <div className="mt-1 text-sm text-white/70">
+                  {winner.participantType === 'company' ? 'Компани (ялагч)' : 'Баримтын дугаар (ялагч)'}
+                </div>
                 <div className="mt-1 text-xl font-extrabold tracking-tight">{winner.winnerName}</div>
                 <div className="mt-4 grid gap-1 text-sm text-white/80">
                   <div>
@@ -316,7 +325,7 @@ export default function AdminDrawPage() {
                         key={`${e.id}-${index}`}
                         className="inline-flex items-baseline gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/15"
                       >
-                        <span className="font-extrabold tracking-tight">{e.receiptNumber}</span>
+                        <span className="font-extrabold tracking-tight">{e.displayLabel}</span>
                         <span className="text-[0.7rem] font-bold text-white/50">×</span>
                         <span className="font-extrabold text-emerald-200/95 tabular-nums">{e.chances}</span>
                       </span>

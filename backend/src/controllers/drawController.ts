@@ -6,6 +6,7 @@ import { WinnerModel } from '../models/Winner.js';
 import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
 import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
 import { effectiveDrawChances } from '../utils/drawChances.js';
+import { submissionPoolLabel } from '../utils/submissionDisplay.js';
 
 const SpinSchema = z.object({
   prizeName: z.string().min(1).max(160),
@@ -19,7 +20,16 @@ function randomInt(maxExclusive: number) {
 
 async function pickWeightedSubmission(filter: Record<string, unknown>) {
   const rows = await SubmissionModel.find(filter)
-    .select({ _id: 1, fullName: 1, phone: 1, productName: 1, receiptNumber: 1, chances: 1 })
+    .select({
+      _id: 1,
+      fullName: 1,
+      phone: 1,
+      productName: 1,
+      receiptNumber: 1,
+      companyName: 1,
+      participantType: 1,
+      chances: 1
+    })
     .lean();
 
   const weighted = rows
@@ -66,7 +76,11 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   let forcedApplied = false;
   let forcedReason: string | null = null;
   if (forcedRequested) {
-    winnerSubmission = await SubmissionModel.findOne({ ...filter, receiptNumber: forcedRequested });
+    winnerSubmission = await SubmissionModel.findOne({
+      ...filter,
+      receiptNumber: forcedRequested,
+      $or: [{ participantType: 'user' }, { participantType: { $exists: false } }]
+    });
     const w = winnerSubmission ? effectiveDrawChances(winnerSubmission as any) : 0;
     if (winnerSubmission && w > 0) forcedApplied = true;
     else {
@@ -83,12 +97,18 @@ export async function spinDraw(req: AuthRequest, res: Response) {
 
   // Prevent duplicates (race-safe)
   try {
+    const ws = winnerSubmission as any;
+    const pt = (ws.participantType as 'user' | 'company' | undefined) ?? 'user';
+    const displayName =
+      pt === 'company' ? String(ws.companyName || ws.fullName || '').trim() : ws.fullName;
     const winner = await WinnerModel.create({
-      winnerName: winnerSubmission.fullName,
+      winnerName: displayName,
       phone: winnerSubmission.phone,
       productName: winnerSubmission.productName,
       prizeName,
-      receiptNumber: winnerSubmission.receiptNumber,
+      participantType: pt,
+      receiptNumber: pt === 'company' ? undefined : ws.receiptNumber,
+      companyName: pt === 'company' ? ws.companyName : undefined,
       drawDate: new Date(),
       submissionId: winnerSubmission._id
     });
@@ -101,7 +121,10 @@ export async function spinDraw(req: AuthRequest, res: Response) {
       },
       winner: {
         id: winner._id.toString(),
-        receiptNumber: winnerSubmission.receiptNumber,
+        receiptNumber: pt === 'company' ? undefined : ws.receiptNumber,
+        companyName: pt === 'company' ? ws.companyName : undefined,
+        participantType: pt,
+        displayLabel: submissionPoolLabel(ws),
         winnerName: winner.winnerName,
         phone: winner.phone,
         productName: winner.productName,
