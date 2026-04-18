@@ -6,17 +6,42 @@ import { env } from '../config/env.js';
 import { UserModel } from '../models/User.js';
 import type { AuthRequest } from '../types/express.js';
 
-const RegisterSchema = z.object({
-  fullName: z.string().min(2).max(120),
-  phone: z.string().min(6).max(32),
-  age: z.coerce.number().int().min(1).max(120),
-  password: z.string().min(6).max(128)
-});
+const RegisterSchema = z
+  .object({
+    accountType: z.enum(['user', 'company']).default('user'),
+    phone: z.string().min(6).max(32),
+    password: z.string().min(6).max(128),
+    fullName: z.string().min(2).max(120).optional(),
+    companyName: z.string().min(2).max(160).optional(),
+    age: z.coerce.number().int().min(1).max(120).optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.accountType === 'user') {
+      if (!data.fullName?.trim()) {
+        ctx.addIssue({ code: 'custom', message: 'fullName required', path: ['fullName'] });
+      }
+      if (data.age === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'age required', path: ['age'] });
+      }
+    } else if (!data.companyName?.trim()) {
+      ctx.addIssue({ code: 'custom', message: 'companyName required', path: ['companyName'] });
+    }
+  });
 
 const LoginSchema = z.object({
   phone: z.string().min(6).max(32),
   password: z.string().min(1)
 });
+
+function publicUser(u: { _id: unknown; fullName: string; phone: string; age: number; accountType?: string }) {
+  return {
+    id: String(u._id),
+    fullName: u.fullName,
+    phone: u.phone,
+    age: u.age,
+    accountType: (u.accountType === 'company' ? 'company' : 'user') as 'user' | 'company'
+  };
+}
 
 function signUserToken(user: { id: string; phone: string }) {
   return jwt.sign({ phone: user.phone, typ: 'user' }, env.JWT_SECRET, {
@@ -33,17 +58,22 @@ export async function registerUser(req: Request, res: Response) {
   if (exists) return res.status(409).json({ message: 'Phone already registered' });
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const isCompany = parsed.data.accountType === 'company';
+  const fullName = isCompany ? parsed.data.companyName!.trim() : parsed.data.fullName!.trim();
+  const age = isCompany ? (parsed.data.age ?? 21) : parsed.data.age!;
+
   const user = await UserModel.create({
-    fullName: parsed.data.fullName,
+    fullName,
     phone: parsed.data.phone,
-    age: parsed.data.age,
+    age,
+    accountType: parsed.data.accountType,
     passwordHash
   });
 
   const token = signUserToken({ id: user._id.toString(), phone: user.phone });
   return res.status(201).json({
     token,
-    user: { id: user._id.toString(), fullName: user.fullName, phone: user.phone, age: user.age }
+    user: publicUser(user.toObject() as any)
   });
 }
 
@@ -60,7 +90,7 @@ export async function loginUser(req: Request, res: Response) {
   const token = signUserToken({ id: user._id.toString(), phone: user.phone });
   return res.json({
     token,
-    user: { id: user._id.toString(), fullName: user.fullName, phone: user.phone, age: user.age }
+    user: publicUser(user.toObject() as any)
   });
 }
 
@@ -68,6 +98,6 @@ export async function me(req: AuthRequest, res: Response) {
   if (!req.user?.id) return res.status(401).json({ message: 'Unauthorized' });
   const user = await UserModel.findById(req.user.id).select({ passwordHash: 0 }).lean();
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
-  return res.json({ user: { id: String(user._id), fullName: user.fullName, phone: user.phone, age: user.age } });
+  return res.json({ user: publicUser(user as any) });
 }
 

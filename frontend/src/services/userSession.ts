@@ -2,7 +2,13 @@ import { api } from './api';
 
 const TOKEN_KEY = 'user_token_v1';
 
-export type User = { id: string; fullName: string; phone: string; age: number };
+export type User = {
+  id: string;
+  fullName: string;
+  phone: string;
+  age: number;
+  accountType?: 'user' | 'company';
+};
 
 export function getUserToken() {
   if (typeof window === 'undefined') return null;
@@ -22,8 +28,30 @@ export function userAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function registerUser(input: { fullName: string; phone: string; age: number; password: string }) {
-  const res = await api.post<{ token: string; user: User }>('/api/auth/register', input);
+export async function registerUser(input: {
+  accountType: 'user' | 'company';
+  phone: string;
+  password: string;
+  fullName?: string;
+  age?: number;
+  companyName?: string;
+}) {
+  const body =
+    input.accountType === 'company'
+      ? {
+          accountType: 'company' as const,
+          companyName: input.companyName,
+          phone: input.phone,
+          password: input.password
+        }
+      : {
+          accountType: 'user' as const,
+          fullName: input.fullName,
+          age: input.age,
+          phone: input.phone,
+          password: input.password
+        };
+  const res = await api.post<{ token: string; user: User }>('/api/auth/register', body);
   setUserToken(res.data.token);
   return res.data.user;
 }

@@ -9,14 +9,17 @@ import { ReceiptSection } from '@/sections/ReceiptSection';
 import { clearUserToken, fetchMe, loginUser, registerUser, type User } from '@/services/userSession';
 
 type Tab = 'login' | 'register';
+type RegisterKind = 'user' | 'company';
 
 export default function ReceiptPage() {
   const [tab, setTab] = useState<Tab>('login');
+  const [registerKind, setRegisterKind] = useState<RegisterKind>('user');
   const [session, setSession] = useState<User | null>(null);
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [age, setAge] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +49,29 @@ export default function ReceiptPage() {
     setError(null);
     setLoading(true);
     try {
-      const ageNum = Number(age);
-      if (!Number.isFinite(ageNum) || ageNum < 1 || ageNum > 120) throw new Error('AGE');
-      const s = await registerUser({ fullName: fullName.trim(), phone: phone.trim(), password, age: ageNum });
-      setSession(s);
+      if (registerKind === 'user') {
+        const ageNum = Number(age);
+        if (!Number.isFinite(ageNum) || ageNum < 1 || ageNum > 120) throw new Error('AGE');
+        const s = await registerUser({
+          accountType: 'user',
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          password,
+          age: ageNum
+        });
+        setSession(s);
+      } else {
+        if (!companyName.trim()) throw new Error('COMPANY');
+        const s = await registerUser({
+          accountType: 'company',
+          companyName: companyName.trim(),
+          phone: phone.trim(),
+          password
+        });
+        setSession(s);
+      }
     } catch {
-      setError('Бүртгүүлэх боломжгүй (утас давхардсан байж магадгүй).');
+      setError('Бүртгүүлэх боломжгүй (утас давхардсан эсвэл мэдээлэл дутуу байж магадгүй).');
     } finally {
       setLoading(false);
     }
@@ -68,7 +88,17 @@ export default function ReceiptPage() {
             </Link>
             <div className="flex items-center gap-3">
               <div className="text-sm text-white/70">
-                <span className="font-semibold text-white/90">{session.fullName}</span> · {session.phone} · {session.age} настай
+                {session.accountType === 'company' ? (
+                  <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-100 ring-1 ring-amber-200/30">
+                    Компани
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-xs font-bold text-sky-100 ring-1 ring-sky-200/30">
+                    Хэрэглэгч
+                  </span>
+                )}{' '}
+                <span className="font-semibold text-white/90">{session.fullName}</span> · {session.phone}
+                {session.accountType !== 'company' ? <> · {session.age} настай</> : null}
               </div>
               <button
                 type="button"
@@ -85,7 +115,13 @@ export default function ReceiptPage() {
         </div>
 
         {/* Upload after login */}
-        <ReceiptSection defaults={{ fullName: session.fullName, phone: session.phone }} />
+        <ReceiptSection
+          defaults={{
+            fullName: session.fullName,
+            phone: session.phone,
+            accountType: session.accountType ?? 'user'
+          }}
+        />
       </div>
     );
   }
@@ -97,7 +133,7 @@ export default function ReceiptPage() {
       <div className="mx-auto max-w-2xl">
         <h1 className="text-3xl font-extrabold tracking-tight">Баримт оруулах</h1>
         <p className="mt-2 text-sm text-white/70">
-          Эхлээд нэвтэрнэ эсвэл шинээр бүртгүүлээд дараа нь баримтаа илгээнэ үү.
+          Хувь хүн эсвэл компаниар нэвтэрнэ эсвэл бүртгүүлээд дараа нь илгээнэ үү.
         </p>
 
         <div className="mt-6">
@@ -113,7 +149,10 @@ export default function ReceiptPage() {
               <div className="rounded-full bg-white/10 ring-1 ring-white/15 p-1 flex">
                 <button
                   type="button"
-                  onClick={() => setTab('login')}
+                  onClick={() => {
+                    setTab('login');
+                    setError(null);
+                  }}
                   className={`rounded-full px-5 py-2 text-sm font-bold transition ${
                     tab === 'login' ? 'bg-white text-slate-900' : 'text-white/80 hover:text-white'
                   }`}
@@ -122,7 +161,10 @@ export default function ReceiptPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTab('register')}
+                  onClick={() => {
+                    setTab('register');
+                    setError(null);
+                  }}
                   className={`rounded-full px-5 py-2 text-sm font-bold transition ${
                     tab === 'register' ? 'bg-white text-slate-900' : 'text-white/80 hover:text-white'
                   }`}
@@ -159,23 +201,65 @@ export default function ReceiptPage() {
                 </form>
               ) : (
                 <form onSubmit={onRegister} className="grid gap-4">
-                  <Field label="Овог нэр">
-                    <input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none focus:ring-sky-300/60"
-                      placeholder="Ж: Бат-Эрдэнэ"
-                    />
-                  </Field>
-                  <Field label="Нас">
-                    <input
-                      value={age}
-                      onChange={(e) => setAge(e.target.value)}
-                      inputMode="numeric"
-                      className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none focus:ring-sky-300/60"
-                      placeholder="Ж: 21"
-                    />
-                  </Field>
+                  <div className="grid gap-2">
+                    <span className="text-xs font-semibold text-white/70">Бүртгэлийн төрөл</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRegisterKind('user')}
+                        className={`rounded-full px-4 py-2 text-sm font-extrabold ring-1 transition ${
+                          registerKind === 'user'
+                            ? 'bg-white text-slate-900 ring-white'
+                            : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                        }`}
+                      >
+                        Хэрэглэгч
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegisterKind('company')}
+                        className={`rounded-full px-4 py-2 text-sm font-extrabold ring-1 transition ${
+                          registerKind === 'company'
+                            ? 'bg-white text-slate-900 ring-white'
+                            : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                        }`}
+                      >
+                        Компани
+                      </button>
+                    </div>
+                  </div>
+
+                  {registerKind === 'user' ? (
+                    <Field label="Овог нэр">
+                      <input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none focus:ring-sky-300/60"
+                        placeholder="Ж: Бат-Эрдэнэ"
+                      />
+                    </Field>
+                  ) : (
+                    <Field label="Компанийн нэр">
+                      <input
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none focus:ring-sky-300/60"
+                        placeholder="Ж: Bosa LLC"
+                      />
+                    </Field>
+                  )}
+
+                  {registerKind === 'user' ? (
+                    <Field label="Нас">
+                      <input
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        inputMode="numeric"
+                        className="h-12 rounded-2xl bg-white/10 ring-1 ring-white/15 px-4 text-sm text-white outline-none focus:ring-sky-300/60"
+                        placeholder="Ж: 21"
+                      />
+                    </Field>
+                  ) : null}
                   <Field label="Утасны дугаар">
                     <input
                       value={phone}

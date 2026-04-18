@@ -14,7 +14,7 @@ import { formatDateMn } from '@/lib/utils';
 export function ReceiptSection({
   defaults
 }: {
-  defaults?: { fullName?: string; phone?: string };
+  defaults?: { fullName?: string; phone?: string; accountType?: 'user' | 'company' };
 }) {
   const productOptions = useMemo(() => PRODUCTS.map((p) => p.name), []);
 
@@ -52,6 +52,11 @@ export function ReceiptSection({
   useEffect(() => {
     void refreshList();
   }, []);
+
+  useEffect(() => {
+    if (defaults?.accountType === 'company') setParticipantType('company');
+    else setParticipantType('user');
+  }, [defaults?.accountType]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
