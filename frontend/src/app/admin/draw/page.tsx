@@ -11,7 +11,18 @@ import { spin } from '@/services/draw';
 import type { Winner } from '@/types/api';
 import { formatDateMn } from '@/lib/utils';
 import { fetchEligibleDraw } from '@/services/adminEligibleDraw';
+import type { EligibleDrawItem } from '@/services/adminEligibleDraw';
 import Image from 'next/image';
+
+type PoolEntry = { id: string; receiptNumber: string; chances: number };
+
+function shuffleInPlace<T>(arr: T[]) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export default function AdminDrawPage() {
   const prizeThumbs: Record<string, string> = useMemo(
@@ -35,12 +46,18 @@ export default function AdminDrawPage() {
   const [rangeEnd, setRangeEnd] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
   const [eligibleReceiptCount, setEligibleReceiptCount] = useState<number | null>(null);
-  const [eligibleReceiptNumbers, setEligibleReceiptNumbers] = useState<string[]>([]);
+  const [poolEntries, setPoolEntries] = useState<PoolEntry[]>([]);
 
   const wheelSegments = useMemo(() => {
-    // Keep wheel readable/perf-friendly; list below can show more.
-    return eligibleReceiptNumbers.slice(0, 24);
-  }, [eligibleReceiptNumbers]);
+    const expanded: string[] = [];
+    const cap = 500;
+    for (const it of poolEntries) {
+      const n = Math.min(Math.max(0, it.chances), 10_000);
+      for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.receiptNumber);
+    }
+    shuffleInPlace(expanded);
+    return expanded.slice(0, 24);
+  }, [poolEntries]);
 
   const wheelConic = useMemo(() => {
     if (wheelSegments.length < 2) return null;
@@ -90,24 +107,29 @@ export default function AdminDrawPage() {
     setError(null);
     setEligibleCount(null);
     setEligibleReceiptCount(null);
-    setEligibleReceiptNumbers([]);
+    setPoolEntries([]);
     try {
       const startIso = new Date(`${rangeStart}T00:00:00.000Z`).toISOString();
       const endIso = new Date(`${rangeEnd}T23:59:59.999Z`).toISOString();
       const data = await fetchEligibleDraw({ startDate: startIso, endDate: endIso });
       setEligibleCount(data.count ?? 0);
       setEligibleReceiptCount(data.receiptCount ?? data.items.length);
-      const expanded: string[] = [];
-      const cap = 500;
-      for (const it of data.items) {
-        const n = Math.min(Math.max(0, it.chances), 10_000);
-        for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.receiptNumber);
-      }
-      for (let i = expanded.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [expanded[i], expanded[j]] = [expanded[j], expanded[i]];
-      }
-      setEligibleReceiptNumbers(expanded.slice(0, 80));
+      const entries: PoolEntry[] = (data.items as EligibleDrawItem[])
+        .map((it, idx) => {
+          const rawId = it.id ?? it._id;
+          const id =
+            rawId != null && String(rawId).trim() !== ''
+              ? String(rawId)
+              : `pool-${idx}-${it.receiptNumber}`;
+          return {
+            id,
+            receiptNumber: it.receiptNumber,
+            chances: Math.min(Math.max(0, it.chances), 10_000)
+          };
+        })
+        .filter((x) => x.chances > 0)
+        .sort((a, b) => b.chances - a.chances || a.receiptNumber.localeCompare(b.receiptNumber));
+      setPoolEntries(entries);
     } catch {
       setError('Eligible жагсаалтыг уншиж чадсангүй.');
     }
@@ -235,7 +257,20 @@ export default function AdminDrawPage() {
           </GlassCard>
 
           <GlassCard className="p-6">
-            <div className="text-sm font-extrabold tracking-tight">Үр дүн</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-extrabold tracking-tight">Үр дүн</div>
+              <Button
+                size="sm"
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setWinner(null);
+                  setError(null);
+                }}
+              >
+                Цэвэрлэх
+              </Button>
+            </div>
             <div className="mt-2 text-sm text-white/70">Ялагч сонгогдвол шууд `winners` collection-д хадгалагдана.</div>
 
             {!winner ? (
@@ -266,27 +301,29 @@ export default function AdminDrawPage() {
 
             <div className="mt-6">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-extrabold tracking-tight">Pool (жишээ — баримтын № давтагдсан = олон эрх)</div>
+                <div className="text-sm font-extrabold tracking-tight">Pool (баримт × эрхийн тоо)</div>
                 <Button size="sm" variant="secondary" onClick={() => void loadEligible()}>
                   Дахин унших
                 </Button>
               </div>
               <div className="mt-3 rounded-3xl bg-white/5 ring-1 ring-white/10 p-4">
-                {eligibleReceiptNumbers.length === 0 ? (
+                {poolEntries.length === 0 ? (
                   <div className="text-sm text-white/70">Мэдээлэл алга.</div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
-                    {eligibleReceiptNumbers.map((n, idx) => (
+                    {poolEntries.slice(0, 80).map((e, index) => (
                       <span
-                        key={`${n}-${idx}`}
-                        className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/85 ring-1 ring-white/15"
+                        key={`${e.id}-${index}`}
+                        className="inline-flex items-baseline gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/15"
                       >
-                        {n}
+                        <span className="font-extrabold tracking-tight">{e.receiptNumber}</span>
+                        <span className="text-[0.7rem] font-bold text-white/50">×</span>
+                        <span className="font-extrabold text-emerald-200/95 tabular-nums">{e.chances}</span>
                       </span>
                     ))}
-                    {eligibleCount != null && eligibleCount > eligibleReceiptNumbers.length ? (
+                    {poolEntries.length > 80 ? (
                       <span className="text-xs text-white/60 self-center">
-                        +{eligibleCount - eligibleReceiptNumbers.length} эрх (хүрдэнд бүгдийг нь харуулаагүй)
+                        +{poolEntries.length - 80} баримт
                       </span>
                     ) : null}
                   </div>

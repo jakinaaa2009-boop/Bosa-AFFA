@@ -1,7 +1,12 @@
 import { api } from './api';
 import { withAdminAuth } from './admin';
 
-export type EligibleDrawItem = { id: string; receiptNumber: string; chances: number };
+export type EligibleDrawItem = {
+  id?: string;
+  _id?: string;
+  receiptNumber: string;
+  chances: number;
+};
 
 export async function fetchEligibleDraw(input: { startDate: string; endDate: string }) {
   const res = await api.get<{
