@@ -10,7 +10,10 @@ export type SubmissionDoc = {
   productName: string;
   receiptNumber: string;
   amount: number;
-  // New storage (preferred)
+  // R2 storage (preferred)
+  receiptImageKey?: string;
+  receiptImageUrl?: string;
+  // Legacy storage (backward compatibility)
   receiptImageBase64?: string;
   // Backward compatibility (older docs)
   receiptImageData?: Buffer;
@@ -30,6 +33,8 @@ const SubmissionSchema = new Schema<SubmissionDoc>(
     productName: { type: String, required: true, trim: true, maxlength: 120 },
     receiptNumber: { type: String, required: true, trim: true, minlength: 5, maxlength: 64, index: true },
     amount: { type: Number, required: true, min: 0 },
+    receiptImageKey: { type: String, required: false, trim: true, maxlength: 512 },
+    receiptImageUrl: { type: String, required: false, trim: true, maxlength: 2048 },
     receiptImageBase64: { type: String, required: false },
     receiptImageData: { type: Buffer, required: false },
     receiptImageMime: { type: String, required: true, trim: true, maxlength: 64 },

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SubmissionModel, SubmissionStatus } from '../models/Submission.js';
 import type { AuthRequest } from '../types/express.js';
 import { UserModel } from '../models/User.js';
+import { deleteReceiptFromR2, getReceiptObjectFromR2, uploadReceiptToR2 } from '../services/r2.js';
 
 const CreateSubmissionPublicSchema = z.object({
   fullName: z.string().min(2).max(120),
@@ -27,6 +28,8 @@ export async function createSubmission(req: Request, res: Response) {
   if (!file) return res.status(400).json({ message: 'Receipt image is required' });
   if (!file.buffer) return res.status(400).json({ message: 'Receipt image is required' });
 
+  const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
+
   const submission = await SubmissionModel.create({
     fullName: parsed.data.fullName,
     phone: parsed.data.phone,
@@ -34,14 +37,15 @@ export async function createSubmission(req: Request, res: Response) {
     productName: parsed.data.productName,
     receiptNumber: parsed.data.receiptNumber,
     amount: parsed.data.amount,
-    receiptImageBase64: file.buffer.toString('base64'),
     receiptImageMime: file.mimetype,
+    receiptImageKey: uploaded.key,
+    receiptImageUrl: uploaded.url,
     status: 'pending',
     approvedAt: null
   });
 
   const submissionObj = submission.toObject() as any;
-  const { receiptImageBase64, ...safe } = submissionObj;
+  const { receiptImageBase64, receiptImageData, receiptImageKey, receiptImageUrl, ...safe } = submissionObj;
   safe.receiptImage = `/api/submissions/${submission._id.toString()}/receipt`;
 
   return res.status(201).json({ submission: safe });
@@ -59,20 +63,23 @@ export async function createSubmissionForUser(req: AuthRequest, res: Response) {
   const user = await UserModel.findById(req.user.id).lean();
   if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
+  const uploaded = await uploadReceiptToR2({ bytes: file.buffer, mime: file.mimetype });
+
   const submission = await SubmissionModel.create({
     fullName: user.fullName,
     phone: user.phone,
     productName: parsed.data.productName,
     receiptNumber: parsed.data.receiptNumber,
     amount: parsed.data.amount,
-    receiptImageBase64: file.buffer.toString('base64'),
     receiptImageMime: file.mimetype,
+    receiptImageKey: uploaded.key,
+    receiptImageUrl: uploaded.url,
     status: 'pending',
     approvedAt: null
   });
 
   const submissionObj = submission.toObject() as any;
-  const { receiptImageBase64, ...safe } = submissionObj;
+  const { receiptImageBase64, receiptImageData, receiptImageKey, receiptImageUrl, ...safe } = submissionObj;
   safe.receiptImage = `/api/submissions/${submission._id.toString()}/receipt`;
 
   return res.status(201).json({ submission: safe });
@@ -87,7 +94,7 @@ export async function listMySubmissions(req: Request, res: Response) {
   if (!q.success) return res.status(400).json({ message: 'Invalid query' });
 
   const itemsRaw = await SubmissionModel.find({ phone: q.data.phone })
-    .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0, receiptImageKey: 0, receiptImageUrl: 0 })
     .sort({ createdAt: -1 })
     .limit(100)
     .lean();
@@ -103,7 +110,7 @@ export async function listMySubmissions(req: Request, res: Response) {
 export async function listMySubmissionsAuthed(req: AuthRequest, res: Response) {
   if (!req.user?.phone) return res.status(401).json({ message: 'Unauthorized' });
   const itemsRaw = await SubmissionModel.find({ phone: req.user.phone })
-    .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0, receiptImageKey: 0, receiptImageUrl: 0 })
     .sort({ createdAt: -1 })
     .limit(100)
     .lean();
@@ -145,7 +152,7 @@ export async function listSubmissions(req: AuthRequest, res: Response) {
   const skip = (q.data.page - 1) * q.data.limit;
   const [itemsRaw, total] = await Promise.all([
     SubmissionModel.find(filter)
-      .select({ receiptImageBase64: 0, receiptImageMime: 0 })
+      .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0, receiptImageKey: 0, receiptImageUrl: 0 })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(q.data.limit)
@@ -169,15 +176,38 @@ export async function listSubmissions(req: AuthRequest, res: Response) {
 export async function getSubmissionReceiptImage(req: Request, res: Response) {
   const id = req.params.id;
   const doc = await SubmissionModel.findById(id)
-    .select({ receiptImageBase64: 1, receiptImageData: 1, receiptImageMime: 1 })
+    .select({ receiptImageKey: 1, receiptImageUrl: 1, receiptImageBase64: 1, receiptImageData: 1, receiptImageMime: 1 })
     .lean();
   if (!doc) return res.status(404).end();
   if (!doc.receiptImageMime) return res.status(404).end();
 
+  const anyDoc = doc as any;
+  if (anyDoc.receiptImageKey) {
+    try {
+      const obj = await getReceiptObjectFromR2(anyDoc.receiptImageKey);
+      const body: any = (obj as any).Body;
+      if (!body) return res.status(404).end();
+
+      res.setHeader('Content-Type', doc.receiptImageMime);
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+
+      // AWS SDK v3 in Node can return a Readable stream or a web stream-like body.
+      if (typeof body.pipe === 'function') {
+        return body.pipe(res);
+      }
+      if (typeof body.transformToByteArray === 'function') {
+        const bytes = await body.transformToByteArray();
+        return res.status(200).send(Buffer.from(bytes));
+      }
+      return res.status(500).json({ message: 'Unsupported R2 response body' });
+    } catch {
+      // Fall back to legacy storage if present.
+    }
+  }
+
   res.setHeader('Content-Type', doc.receiptImageMime);
   res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
 
-  const anyDoc = doc as any;
   if (anyDoc.receiptImageBase64) {
     const bytes = Buffer.from(anyDoc.receiptImageBase64, 'base64');
     return res.status(200).send(bytes);
@@ -235,7 +265,7 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     status: 'approved',
     approvedAt: { $gte: start, $lte: end }
   })
-    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0 })
+    .select({ receiptImageBase64: 0, receiptImageData: 0, receiptImageMime: 0, receiptImageKey: 0, receiptImageUrl: 0 })
     .sort({ approvedAt: -1 })
     .limit(5000)
     .lean();
@@ -252,8 +282,16 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
 
 export async function deleteSubmission(req: AuthRequest, res: Response) {
   const id = req.params.id;
-  const deleted = await SubmissionModel.findByIdAndDelete(id);
+  const deleted = await SubmissionModel.findByIdAndDelete(id).lean();
   if (!deleted) return res.status(404).json({ message: 'Not found' });
+  const anyDeleted = deleted as any;
+  if (anyDeleted.receiptImageKey) {
+    try {
+      await deleteReceiptFromR2(anyDeleted.receiptImageKey);
+    } catch {
+      // Best-effort cleanup; DB is source of truth.
+    }
+  }
   return res.json({ ok: true });
 }
 

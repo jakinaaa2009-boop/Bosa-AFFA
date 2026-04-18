@@ -5,7 +5,7 @@
 - **Frontend**: Next.js (App Router) + TypeScript + Tailwind + Framer Motion
 - **Backend**: Node.js + Express + TypeScript
 - **DB**: MongoDB + Mongoose
-- **Upload**: Multer (receipt image stored in MongoDB)
+- **Upload**: Multer + Cloudflare R2 (receipt image stored in R2; MongoDB stores only object key/URL)
 - **Admin auth**: JWT
 
 ## Фолдер бүтэц
@@ -24,6 +24,7 @@ npm i
 ```
 
 - MongoDB ажиллаж байх хэрэгтэй (`MONGODB_URI`).
+- Receipt зураг хадгалах зориулалттай Cloudflare R2 тохируулна (`R2_*` env variables).
 
 Асаах:
 
