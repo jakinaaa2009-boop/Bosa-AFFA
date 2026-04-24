@@ -266,6 +266,9 @@ export async function listSubmissions(req: AuthRequest, res: Response) {
     receiptImage: `/api/submissions/${String(s._id)}/receipt`
   }));
 
+  // eslint-disable-next-line no-console
+  console.log('listSubmissions', { total, returned: items.length, page: q.data.page, limit: q.data.limit });
+
   return res.json({
     items,
     page: q.data.page,

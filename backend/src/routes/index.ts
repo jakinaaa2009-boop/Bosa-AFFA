@@ -6,6 +6,7 @@ import { winnersRouter } from './winnerRoutes.js';
 import { usersRouter } from './userRoutes.js';
 import { authRouter } from './authRoutes.js';
 import { forceRouter } from './forceRoutes.js';
+import { debugRouter } from './debugRoutes.js';
 
 export const apiRouter = Router();
 
@@ -16,4 +17,5 @@ apiRouter.use('/draw', drawRouter);
 apiRouter.use('/winners', winnersRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/force', forceRouter);
+apiRouter.use('/', debugRouter);
 

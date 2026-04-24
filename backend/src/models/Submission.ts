@@ -72,5 +72,6 @@ SubmissionSchema.index({ receiptNumber: 1 }, { unique: true, sparse: true });
 
 export const SubmissionModel =
   (mongoose.models.Submission as mongoose.Model<SubmissionDoc>) ??
-  mongoose.model<SubmissionDoc>('Submission', SubmissionSchema);
+  // IMPORTANT: keep in sync with migrated Railway MongoDB collection name.
+  mongoose.model<SubmissionDoc>('Submission', SubmissionSchema, 'receipts');
 

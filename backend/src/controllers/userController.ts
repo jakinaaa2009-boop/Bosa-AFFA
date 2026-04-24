@@ -28,7 +28,7 @@ export async function usersStats(req: AuthRequest, res: Response) {
     { $match: match },
     {
       $lookup: {
-        from: 'submissions',
+        from: 'receipts',
         localField: 'phone',
         foreignField: 'phone',
         as: 'subs'
@@ -142,7 +142,7 @@ export async function listUsers(req: AuthRequest, res: Response) {
     { $sort: { createdAt: -1 as const } },
     {
       $lookup: {
-        from: 'submissions',
+        from: 'receipts',
         localField: 'phone',
         foreignField: 'phone',
         as: 'subs'
@@ -174,6 +174,9 @@ export async function listUsers(req: AuthRequest, res: Response) {
 
   const first = agg?.[0] ?? { items: [], total: [] };
   const total = first.total?.[0]?.count ?? 0;
+
+  // eslint-disable-next-line no-console
+  console.log('listUsers', { accountType: q.data.accountType, total, returned: (first.items ?? []).length });
 
   return res.json({
     items: first.items,

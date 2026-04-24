@@ -8,7 +8,7 @@ export async function listWinners(_req: Request, res: Response) {
     { $limit: 200 },
     {
       $lookup: {
-        from: 'submissions',
+        from: 'receipts',
         localField: 'submissionId',
         foreignField: '_id',
         as: 'sub'
@@ -25,6 +25,9 @@ export async function listWinners(_req: Request, res: Response) {
     },
     { $project: { sub: 0 } }
   ] as any[]);
+
+  // eslint-disable-next-line no-console
+  console.log('listWinners', { returned: winners.length });
 
   return res.json({ winners });
 }

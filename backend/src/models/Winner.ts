@@ -36,5 +36,7 @@ WinnerSchema.index({ prizeName: 1, submissionId: 1 }, { unique: true });
 WinnerSchema.index({ drawDate: -1 });
 
 export const WinnerModel =
-  (mongoose.models.Winner as mongoose.Model<WinnerDoc>) ?? mongoose.model<WinnerDoc>('Winner', WinnerSchema);
+  (mongoose.models.Winner as mongoose.Model<WinnerDoc>) ??
+  // IMPORTANT: keep in sync with migrated Railway MongoDB collection name.
+  mongoose.model<WinnerDoc>('Winner', WinnerSchema, 'winners');
 
