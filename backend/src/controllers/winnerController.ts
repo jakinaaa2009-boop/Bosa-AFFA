@@ -8,7 +8,7 @@ export async function listWinners(_req: Request, res: Response) {
     { $limit: 200 },
     {
       $lookup: {
-        from: 'receipts',
+        from: 'submissions',
         localField: 'submissionId',
         foreignField: '_id',
         as: 'sub'

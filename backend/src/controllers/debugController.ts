@@ -10,22 +10,17 @@ export async function debugDb(_req: AuthRequest, res: Response) {
   const collections = await db.listCollections().toArray();
   const names = collections.map((c) => c.name).sort((a, b) => a.localeCompare(b));
 
-  const counts: Record<string, number> = {};
-  await Promise.all(
-    names.map(async (name) => {
-      try {
-        counts[name] = await db.collection(name).countDocuments({});
-      } catch {
-        counts[name] = -1;
-      }
-    })
-  );
+  const [usersCount, submissionsCount] = await Promise.all([
+    db.collection('users').countDocuments({}),
+    db.collection('submissions').countDocuments({})
+  ]);
 
   return res.json({
     readyState: conn.readyState,
-    databaseName: db.databaseName,
+    dbName: db.databaseName,
     collections: names,
-    counts
+    usersCount,
+    submissionsCount
   });
 }
 

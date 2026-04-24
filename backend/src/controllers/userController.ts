@@ -28,7 +28,7 @@ export async function usersStats(req: AuthRequest, res: Response) {
     { $match: match },
     {
       $lookup: {
-        from: 'receipts',
+        from: 'submissions',
         localField: 'phone',
         foreignField: 'phone',
         as: 'subs'
@@ -142,7 +142,7 @@ export async function listUsers(req: AuthRequest, res: Response) {
     { $sort: { createdAt: -1 as const } },
     {
       $lookup: {
-        from: 'receipts',
+        from: 'submissions',
         localField: 'phone',
         foreignField: 'phone',
         as: 'subs'

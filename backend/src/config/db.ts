@@ -13,6 +13,6 @@ export async function connectDb() {
     // eslint-disable-next-line no-console
     console.error('MongoDB connection error', err);
   });
-  await mongoose.connect(env.MONGODB_URI, { dbName: 'Bosa-CPN' });
+  await mongoose.connect(env.MONGODB_URI, { dbName: 'Bosa-AFFA' });
 }
 
