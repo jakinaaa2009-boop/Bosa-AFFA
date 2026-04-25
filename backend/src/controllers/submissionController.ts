@@ -383,9 +383,18 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     return res.status(400).json({ message: 'Invalid date range' });
   }
 
-  const items = await SubmissionModel.find({
+  // Exclude users who already won any prize.
+  // This does not modify any receipt/submission records; it only affects eligibility.
+  const ineligiblePhones = await UserModel.find({ hasWon: true }).select({ phone: 1 }).lean();
+  const banned = ineligiblePhones.map((u: any) => String(u.phone)).filter(Boolean);
+  const baseFilter: Record<string, unknown> = {
     status: 'approved',
     approvedAt: { $gte: start, $lte: end }
+  };
+  if (banned.length) baseFilter.phone = { $nin: banned };
+
+  const items = await SubmissionModel.find({
+    ...baseFilter
   })
     .select({ receiptNumber: 1, chances: 1, participantType: 1, companyName: 1, fullName: 1 })
     .sort({ approvedAt: -1 })

@@ -4,6 +4,7 @@ import type { AuthRequest } from '../types/express.js';
 import { SubmissionModel } from '../models/Submission.js';
 import { WinnerModel } from '../models/Winner.js';
 import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
+import { UserModel } from '../models/User.js';
 import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
 import { effectiveDrawChances } from '../utils/drawChances.js';
 import { submissionPoolLabel } from '../utils/submissionDisplay.js';
@@ -68,6 +69,12 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const filter: Record<string, unknown> = { status: 'approved', approvedAt: { $gte: start, $lte: end } };
   if (excludeIds.length) filter._id = { $nin: excludeIds };
 
+  // Global eligibility: exclude users that already won any prize.
+  // This does NOT delete or modify their receipts/submissions; it only affects draw eligibility.
+  const ineligiblePhones = await UserModel.find({ hasWon: true }).select({ phone: 1 }).lean();
+  const banned = ineligiblePhones.map((u: any) => String(u.phone)).filter(Boolean);
+  if (banned.length) filter.phone = { $nin: banned };
+
   // Check forced receipt (super-secret override) — ONLY for PlayStation 5
   const forced =
     prizeName === 'PlayStation 5' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
@@ -95,6 +102,15 @@ export async function spinDraw(req: AuthRequest, res: Response) {
     if (!winnerSubmission) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
   }
 
+  // Extra safety: if this winner is a registered user and is already marked as won, refuse.
+  // (Prevents edge-case races when multiple spins happen at once.)
+  const wsAny = winnerSubmission as any;
+  const ptCandidate = (wsAny.participantType as 'user' | 'company' | undefined) ?? 'user';
+  if (ptCandidate !== 'company') {
+    const u = await UserModel.findOne({ phone: winnerSubmission.phone }).select({ hasWon: 1 }).lean();
+    if (u?.hasWon) return res.status(409).json({ message: 'Дахин оролдоно уу' });
+  }
+
   // Prevent duplicates (race-safe)
   try {
     const ws = winnerSubmission as any;
@@ -112,6 +128,11 @@ export async function spinDraw(req: AuthRequest, res: Response) {
       drawDate: new Date(),
       submissionId: winnerSubmission._id
     });
+
+    // Mark user as no longer eligible after winning (individual participants only).
+    if (pt !== 'company') {
+      await UserModel.updateOne({ phone: winnerSubmission.phone }, { $set: { hasWon: true } });
+    }
 
     return res.json({
       forced: {

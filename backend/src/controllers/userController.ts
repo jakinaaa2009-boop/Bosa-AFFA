@@ -202,3 +202,22 @@ export async function deleteUser(req: AuthRequest, res: Response) {
   return res.json({ ok: true, deletedSubmissions: deletedSubs.deletedCount ?? 0, deletedUser: Boolean(deletedUser) });
 }
 
+export async function setUserEligibilityByPhone(req: AuthRequest, res: Response) {
+  const body = z
+    .object({
+      phone: z.string().min(6).max(32),
+      hasWon: z.boolean()
+    })
+    .safeParse(req.body);
+  if (!body.success) return res.status(400).json({ message: 'Invalid payload' });
+
+  const updated = await UserModel.findOneAndUpdate(
+    { phone: body.data.phone.trim() },
+    { $set: { hasWon: body.data.hasWon } },
+    { new: true, projection: { passwordHash: 0 } as any }
+  ).lean();
+
+  if (!updated) return res.status(404).json({ message: 'Not found' });
+  return res.json({ user: updated });
+}
+

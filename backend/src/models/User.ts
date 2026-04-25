@@ -9,6 +9,11 @@ export type UserDoc = {
   age: number;
   /** Defaults to `user` when missing (legacy documents). */
   accountType?: UserAccountTypeType;
+  /**
+   * When true, the user is excluded from draw eligibility (cannot win again)
+   * until an admin resets it.
+   */
+  hasWon?: boolean;
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
@@ -21,6 +26,7 @@ const UserSchema = new Schema<UserDoc>(
     phone: { type: String, required: true, trim: true, minlength: 6, maxlength: 32, unique: true, index: true },
     age: { type: Number, required: true, min: 1, max: 120 },
     accountType: { type: String, enum: UserAccountType, default: 'user', index: true },
+    hasWon: { type: Boolean, required: false, default: false, index: true },
     passwordHash: { type: String, required: true }
   },
   { timestamps: true }

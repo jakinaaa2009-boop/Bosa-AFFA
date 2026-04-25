@@ -12,6 +12,7 @@ import type { Winner } from '@/types/api';
 import { formatDateMn } from '@/lib/utils';
 import { fetchEligibleDraw } from '@/services/adminEligibleDraw';
 import type { EligibleDrawItem } from '@/services/adminEligibleDraw';
+import { setUserEligibilityByPhone } from '@/services/adminUsers';
 import Image from 'next/image';
 
 type PoolEntry = { id: string; displayLabel: string; chances: number };
@@ -96,6 +97,7 @@ export default function AdminDrawPage() {
       await new Promise((r) => setTimeout(r, 900));
       const data = await spin(prizeName, startIso, endIso);
       setWinner(data.winner);
+      await loadEligible(); // refresh pool so winner disappears immediately
     } catch {
       setError('Сугалаа явуулах боломжгүй. Approved оролцогч байхгүй эсвэл давхардал гарсан байж магадгүй.');
     } finally {
@@ -305,6 +307,26 @@ export default function AdminDrawPage() {
                     <span className="font-semibold">{formatDateMn(new Date(winner.drawDate))}</span>
                   </div>
                 </div>
+
+                {winner.phone ? (
+                  <div className="mt-5">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await setUserEligibilityByPhone({ phone: winner.phone, hasWon: false });
+                          await loadEligible();
+                        } catch {
+                          setError('Ялагчийн эрхийг reset хийж чадсангүй.');
+                        }
+                      }}
+                    >
+                      Энэ хэрэглэгчийг дахин eligible болгох (reset)
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             )}
 

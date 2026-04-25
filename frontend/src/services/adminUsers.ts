@@ -32,6 +32,7 @@ export type AdminUserRow = {
   fullName: string;
   age: number;
   accountType?: 'user' | 'company';
+  hasWon?: boolean;
   totalSubmissions: number;
   approvedSubmissions: number;
   lastSubmittedAt?: string;
@@ -73,6 +74,15 @@ export async function deleteUserById(id: string) {
     {
       headers: withAdminAuth()
     }
+  );
+  return res.data;
+}
+
+export async function setUserEligibilityByPhone(input: { phone: string; hasWon: boolean }) {
+  const res = await api.patch<{ user: AdminUserRow }>(
+    '/api/users/eligibility',
+    { phone: input.phone, hasWon: input.hasWon },
+    { headers: withAdminAuth() }
   );
   return res.data;
 }
