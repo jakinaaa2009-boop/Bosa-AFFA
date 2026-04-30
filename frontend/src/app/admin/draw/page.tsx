@@ -50,14 +50,9 @@ export default function AdminDrawPage() {
   const [poolEntries, setPoolEntries] = useState<PoolEntry[]>([]);
 
   const wheelSegments = useMemo(() => {
-    const expanded: string[] = [];
-    const cap = 500;
-    for (const it of poolEntries) {
-      const n = Math.min(Math.max(0, it.chances), 10_000);
-      for (let i = 0; i < n && expanded.length < cap; i++) expanded.push(it.displayLabel);
-    }
-    shuffleInPlace(expanded);
-    return expanded.slice(0, 24);
+    const labels = poolEntries.map((it) => it.displayLabel).filter(Boolean);
+    shuffleInPlace(labels);
+    return labels.slice(0, 24);
   }, [poolEntries]);
 
   const wheelConic = useMemo(() => {
@@ -215,10 +210,10 @@ export default function AdminDrawPage() {
             <div className="text-sm font-extrabold tracking-tight">Эргүүлэх хүрд</div>
             <div className="mt-2 text-sm text-white/70">
               Зөвхөн <span className="font-semibold text-white/85">approved</span> бөгөөд сонгосон огнооны хүрээнд
-              баталгаажсан баримтуудаас сонгоно. Нэг бараанд нэг эрх: олон бараа = олон эрх (жинтэй санамсаргүй).
+              баталгаажсан баримтуудаас сонгоно. Бүгд ижил магадлалтай (random).
             </div>
             <div className="mt-3 text-sm text-white/70">
-              Нийт эрх (pool): <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
+              Нийт оролцогч: <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
               {eligibleReceiptCount != null ? (
                 <>
                   {' '}
@@ -332,7 +327,7 @@ export default function AdminDrawPage() {
 
             <div className="mt-6">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-extrabold tracking-tight">Pool (баримт × эрхийн тоо)</div>
+                <div className="text-sm font-extrabold tracking-tight">Pool (оролцогчид)</div>
                 <Button size="sm" variant="secondary" onClick={() => void loadEligible()}>
                   Дахин унших
                 </Button>
@@ -348,8 +343,6 @@ export default function AdminDrawPage() {
                         className="inline-flex items-baseline gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/15"
                       >
                         <span className="font-extrabold tracking-tight">{e.displayLabel}</span>
-                        <span className="text-[0.7rem] font-bold text-white/50">×</span>
-                        <span className="font-extrabold text-emerald-200/95 tabular-nums">{e.chances}</span>
                       </span>
                     ))}
                     {poolEntries.length > 80 ? (
