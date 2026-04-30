@@ -9,7 +9,7 @@ const prizeImages: Record<string, string> = {
   'Samsung crystal UHD 50 inch smart tv': '/prizes/smartTV.png',
   'Airpod gen 4': '/prizes/headphone.png',
   'PlayStation 5': '/prizes/playstation5.png',
-  'Пүүз / спорт шагнал- 500,000₮ воучер': '/prizes/puzz.png',
+  'Пүүз / спорт шагнал- 500,000₮ воучер': '/prizes/puuz2.png',
   'ФИФА 2026 тэмцээний Аргентины албан ёсны өмсгөл': '/prizes/jersey.png',
   'ФИФА 2026 тэмцээний албан ёсны бөмбөг': '/prizes/fifa.png'
 };
