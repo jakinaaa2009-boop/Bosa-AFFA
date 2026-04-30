@@ -1,19 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { RequireAdmin } from '@/components/admin/RequireAdmin';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/Button';
 import type { Winner } from '@/types/api';
 import { fetchWinners } from '@/services/winners';
-import { deleteWinnerById } from '@/services/adminWinners';
+import { deleteWinnerById, updateWinnerPrizeName } from '@/services/adminWinners';
 import { formatDateMn } from '@/lib/utils';
+import { PRIZES } from '@/lib/constants';
 
 export default function AdminWinnersPage() {
   const [items, setItems] = useState<Winner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editPrizeName, setEditPrizeName] = useState<string>('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const prizeOptions = useMemo(() => PRIZES.map((p) => p.name), []);
 
   async function load() {
     setLoading(true);
@@ -60,7 +66,72 @@ export default function AdminWinnersPage() {
                           : `Баримт · ${w.displayLabel ?? w.receiptNumber ?? '—'}`}
                       </div>
                       <div className="mt-1 text-sm text-white/75">
-                        <span className="text-white/60">Шагнал:</span> <span className="font-semibold">{w.prizeName}</span>
+                        <span className="text-white/60">Шагнал:</span>{' '}
+                        {editId && w._id && editId === w._id ? (
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <select
+                              value={editPrizeName}
+                              onChange={(e) => setEditPrizeName(e.target.value)}
+                              className="h-9 max-w-[420px] rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm font-bold text-white outline-none"
+                            >
+                              {prizeOptions.map((p) => (
+                                <option key={p} value={p} className="text-slate-900">
+                                  {p}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              className={savingId === w._id ? 'opacity-60 pointer-events-none' : undefined}
+                              onClick={async () => {
+                                if (!w._id) return;
+                                try {
+                                  setSavingId(w._id);
+                                  await updateWinnerPrizeName(w._id, editPrizeName);
+                                  setEditId(null);
+                                  setEditPrizeName('');
+                                  await load();
+                                } catch {
+                                  setError('Шагналын нэр шинэчилж чадсангүй (давхардал байж магадгүй).');
+                                } finally {
+                                  setSavingId(null);
+                                }
+                              }}
+                            >
+                              Хадгалах
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              type="button"
+                              onClick={() => {
+                                setEditId(null);
+                                setEditPrizeName('');
+                              }}
+                            >
+                              Болих
+                            </Button>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="font-semibold">{w.prizeName}</span>
+                            {w._id ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                type="button"
+                                onClick={() => {
+                                  setError(null);
+                                  setEditId(w._id as string);
+                                  setEditPrizeName(w.prizeName);
+                                }}
+                              >
+                                Засах
+                              </Button>
+                            ) : null}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
