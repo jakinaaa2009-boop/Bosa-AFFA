@@ -221,3 +221,12 @@ export async function setUserEligibilityByPhone(req: AuthRequest, res: Response)
   return res.json({ user: updated });
 }
 
+export async function resetAllUsersEligibility(_req: AuthRequest, res: Response) {
+  const r = await UserModel.updateMany({}, { $set: { hasWon: false } });
+  return res.json({
+    ok: true,
+    matched: r.matchedCount ?? 0,
+    modified: r.modifiedCount ?? 0
+  });
+}
+

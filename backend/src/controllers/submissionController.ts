@@ -405,6 +405,7 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     .map((s: any) => ({
       id: String(s._id),
       receiptNumber: s.receiptNumber,
+      companyName: s.companyName,
       participantType: s.participantType ?? 'user',
       displayLabel: submissionPoolLabel(s),
       chances: effectiveDrawChances(s)

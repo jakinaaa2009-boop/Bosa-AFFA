@@ -87,3 +87,12 @@ export async function setUserEligibilityByPhone(input: { phone: string; hasWon: 
   return res.data;
 }
 
+export async function resetAllUsersEligibility() {
+  const res = await api.post<{ ok: boolean; matched: number; modified: number }>(
+    '/api/users/eligibility/reset-all',
+    {},
+    { headers: withAdminAuth() }
+  );
+  return res.data;
+}
+

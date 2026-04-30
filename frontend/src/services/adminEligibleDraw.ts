@@ -6,6 +6,7 @@ export type EligibleDrawItem = {
   id?: string;
   _id?: string;
   receiptNumber?: string;
+  companyName?: string;
   displayLabel: string;
   participantType?: ParticipantType;
   chances: number;
