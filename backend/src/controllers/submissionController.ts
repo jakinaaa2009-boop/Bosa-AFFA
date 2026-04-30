@@ -411,10 +411,12 @@ export async function listEligibleForDraw(req: AuthRequest, res: Response) {
     }))
     .filter((x) => x.chances > 0);
 
-  // count = number of eligible participants (uniform random draw)
+  const totalChances = itemsOut.reduce((sum, x) => sum + x.chances, 0);
+
+  // count = total lottery tickets (weighted pool size); receiptCount = distinct receipts
   return res.json({
     items: itemsOut,
-    count: itemsOut.length,
+    count: totalChances,
     receiptCount: itemsOut.length
   });
 }

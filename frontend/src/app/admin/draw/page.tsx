@@ -16,6 +16,7 @@ import { setUserEligibilityByPhone } from '@/services/adminUsers';
 import Image from 'next/image';
 
 type PoolEntry = { id: string; displayLabel: string; chances: number };
+type WheelSlice = { label: string; chances: number; color: string };
 
 function shuffleInPlace<T>(arr: T[]) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -23,6 +24,23 @@ function shuffleInPlace<T>(arr: T[]) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function hashString(s: string) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function hsl(h: number, s: number, l: number) {
+  return `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%)`;
 }
 
 export default function AdminDrawPage() {
@@ -49,37 +67,51 @@ export default function AdminDrawPage() {
   const [eligibleReceiptCount, setEligibleReceiptCount] = useState<number | null>(null);
   const [poolEntries, setPoolEntries] = useState<PoolEntry[]>([]);
 
-  const wheelSegments = useMemo(() => {
-    const labels = poolEntries.map((it) => it.displayLabel).filter(Boolean);
-    shuffleInPlace(labels);
-    return labels.slice(0, 24);
+  const wheelSlices = useMemo<WheelSlice[]>(() => {
+    // Dynamic slices: each participant is a slice whose angle is proportional to chances (эрх).
+    // Limit slice count so the wheel stays readable.
+    const maxSlices = 60;
+    const sorted = [...poolEntries]
+      .filter((x) => x.displayLabel && x.chances > 0)
+      .sort((a, b) => b.chances - a.chances || a.displayLabel.localeCompare(b.displayLabel));
+
+    const slices = sorted.slice(0, maxSlices);
+    const total = slices.reduce((sum, x) => sum + x.chances, 0);
+    if (total <= 0) return [];
+
+    const maxChance = slices[0]?.chances ?? 1;
+    const minChance = slices[slices.length - 1]?.chances ?? 1;
+    const denom = Math.max(1, maxChance - minChance);
+
+    return slices.map((x) => {
+      const baseHue = hashString(x.displayLabel) % 360;
+      // More эрх => a bit brighter/more saturated.
+      const t = clamp((x.chances - minChance) / denom, 0, 1);
+      const sat = 60 + t * 25;
+      const light = 48 + t * 10;
+      return { label: x.displayLabel, chances: x.chances, color: hsl(baseHue, sat, light) };
+    });
   }, [poolEntries]);
 
   const wheelConic = useMemo(() => {
-    if (wheelSegments.length < 2) return null;
-    const palette = [
-      '#f472b6', // pink
-      '#fbbf24', // amber
-      '#fb7185', // rose
-      '#60a5fa', // blue
-      '#34d399', // emerald
-      '#a78bfa', // violet
-      '#22d3ee', // cyan
-      '#f97316' // orange
-    ];
-    const step = 360 / wheelSegments.length;
+    if (wheelSlices.length < 2) return null;
+    const total = wheelSlices.reduce((sum, x) => sum + x.chances, 0);
+    if (total <= 0) return null;
+
     const stops: string[] = [];
-    for (let i = 0; i < wheelSegments.length; i++) {
-      const a0 = i * step;
-      const a1 = (i + 1) * step;
-      const c = palette[i % palette.length];
-      // add tiny separators for "fairness" readability
-      const sep = Math.min(0.7, step * 0.06);
-      stops.push(`${c} ${a0}deg ${(a1 - sep).toFixed(3)}deg`);
+    let a = 0;
+    for (const s of wheelSlices) {
+      const span = (s.chances / total) * 360;
+      const a0 = a;
+      const a1 = a + span;
+      // Separator size scales with slice size but stays subtle.
+      const sep = Math.min(0.9, Math.max(0.25, span * 0.03));
+      stops.push(`${s.color} ${a0.toFixed(3)}deg ${(a1 - sep).toFixed(3)}deg`);
       stops.push(`rgba(255,255,255,0.85) ${(a1 - sep).toFixed(3)}deg ${a1.toFixed(3)}deg`);
+      a = a1;
     }
     return `conic-gradient(from -90deg, ${stops.join(', ')})`;
-  }, [wheelSegments.length]);
+  }, [wheelSlices]);
 
   async function onSpin() {
     setError(null);
@@ -210,10 +242,10 @@ export default function AdminDrawPage() {
             <div className="text-sm font-extrabold tracking-tight">Эргүүлэх хүрд</div>
             <div className="mt-2 text-sm text-white/70">
               Зөвхөн <span className="font-semibold text-white/85">approved</span> бөгөөд сонгосон огнооны хүрээнд
-              баталгаажсан баримтуудаас сонгоно. Бүгд ижил магадлалтай (random).
+              баталгаажсан баримтуудаас сонгоно. Нэг бараанд нэг эрх: олон бараа = олон эрх (жинтэй санамсаргүй).
             </div>
             <div className="mt-3 text-sm text-white/70">
-              Нийт оролцогч: <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
+              Нийт эрх (pool): <span className="font-semibold text-white/85">{eligibleCount ?? '—'}</span>
               {eligibleReceiptCount != null ? (
                 <>
                   {' '}
@@ -327,7 +359,7 @@ export default function AdminDrawPage() {
 
             <div className="mt-6">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-extrabold tracking-tight">Pool (оролцогчид)</div>
+                <div className="text-sm font-extrabold tracking-tight">Pool (баримт × эрхийн тоо)</div>
                 <Button size="sm" variant="secondary" onClick={() => void loadEligible()}>
                   Дахин унших
                 </Button>
@@ -343,6 +375,8 @@ export default function AdminDrawPage() {
                         className="inline-flex items-baseline gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/15"
                       >
                         <span className="font-extrabold tracking-tight">{e.displayLabel}</span>
+                        <span className="text-[0.7rem] font-bold text-white/50">×</span>
+                        <span className="font-extrabold text-emerald-200/95 tabular-nums">{e.chances}</span>
                       </span>
                     ))}
                     {poolEntries.length > 80 ? (

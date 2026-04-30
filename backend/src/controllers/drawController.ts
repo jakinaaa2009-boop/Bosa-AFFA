@@ -6,6 +6,7 @@ import { WinnerModel } from '../models/Winner.js';
 import { ForcedReceiptModel } from '../models/ForcedReceipt.js';
 import { UserModel } from '../models/User.js';
 import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
+import { effectiveDrawChances } from '../utils/drawChances.js';
 import { submissionPoolLabel } from '../utils/submissionDisplay.js';
 
 const SpinSchema = z.object({
@@ -14,23 +15,40 @@ const SpinSchema = z.object({
   endDate: z.string().min(1)
 });
 
-async function pickRandomSubmission(filter: Record<string, unknown>) {
-  const row = await SubmissionModel.aggregate([
-    { $match: filter as any },
-    { $sample: { size: 1 } },
-    {
-      $project: {
-        _id: 1,
-        fullName: 1,
-        phone: 1,
-        productName: 1,
-        receiptNumber: 1,
-        companyName: 1,
-        participantType: 1
-      }
-    }
-  ]);
-  return row?.[0] ?? null;
+function randomInt(maxExclusive: number) {
+  return Math.floor(Math.random() * maxExclusive);
+}
+
+async function pickWeightedSubmission(filter: Record<string, unknown>) {
+  const rows = await SubmissionModel.find(filter)
+    .select({
+      _id: 1,
+      fullName: 1,
+      phone: 1,
+      productName: 1,
+      receiptNumber: 1,
+      companyName: 1,
+      participantType: 1,
+      chances: 1
+    })
+    .lean();
+
+  const weighted = rows
+    .map((s: any) => ({ doc: s, w: effectiveDrawChances(s) }))
+    .filter((x) => x.w > 0);
+  if (weighted.length === 0) return null;
+
+  // Equivalent to: each submission appears `w` times in a pool, then pick uniformly at random.
+  let total = 0;
+  for (const { w } of weighted) total += w;
+  let r = randomInt(total);
+  for (const { doc, w } of weighted) {
+    if (r < w) return await SubmissionModel.findById(doc._id);
+    r -= w;
+  }
+  const last = weighted[weighted.length - 1];
+  if (!last) return null;
+  return await SubmissionModel.findById(last.doc._id);
 }
 
 export async function spinDraw(req: AuthRequest, res: Response) {
@@ -70,16 +88,17 @@ export async function spinDraw(req: AuthRequest, res: Response) {
       receiptNumber: forcedRequested,
       $or: [{ participantType: 'user' }, { participantType: { $exists: false } }]
     });
-    if (winnerSubmission) forcedApplied = true;
+    const w = winnerSubmission ? effectiveDrawChances(winnerSubmission as any) : 0;
+    if (winnerSubmission && w > 0) forcedApplied = true;
     else {
       winnerSubmission = null;
       forcedReason =
-        'Forced receipt нь сонгосон хугацааны eligible (approved) жагсаалтад байхгүй байна.';
+        'Forced receipt нь сонгосон хугацааны eligible (approved, эрхтэй) жагсаалтад байхгүй эсвэл эрх 0 байна.';
     }
   }
 
   if (!winnerSubmission) {
-    winnerSubmission = await pickRandomSubmission(filter);
+    winnerSubmission = await pickWeightedSubmission(filter);
     if (!winnerSubmission) return res.status(400).json({ message: 'Оролцогч олдсонгүй' });
   }
 
