@@ -390,7 +390,7 @@ export default function AdminDrawPage() {
                       }
                     }}
                   >
-                    Reset (бүгд оролцоно)
+                    Reset
                   </Button>
                   <Button size="sm" variant="secondary" type="button" onClick={() => setShowAllPool((v) => !v)}>
                     Бүгдийг харах
