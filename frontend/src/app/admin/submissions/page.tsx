@@ -12,10 +12,27 @@ import { formatDateMn } from '@/lib/utils';
 type Status = 'pending' | 'approved' | 'rejected' | 'all';
 type SubmitterTab = 'all' | 'user' | 'company';
 
+const PAGE_SIZE = 50;
+
+const statusTabs: { value: Status; label: string }[] = [
+  { value: 'all', label: 'Бүгд' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' }
+];
+
+const submitterTabs: { value: SubmitterTab; label: string }[] = [
+  { value: 'all', label: 'Бүгд' },
+  { value: 'user', label: 'Хэрэглэгч' },
+  { value: 'company', label: 'Компани' }
+];
+
 export default function AdminSubmissionsPage() {
   const [status, setStatus] = useState<Status>('all');
   const [submitterTab, setSubmitterTab] = useState<SubmitterTab>('all');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +50,11 @@ export default function AdminSubmissionsPage() {
     return v;
   }
 
-  async function load() {
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
+
+  async function load(nextPage = page) {
     setLoading(true);
     setError(null);
     try {
@@ -41,9 +62,12 @@ export default function AdminSubmissionsPage() {
         status: apiStatus,
         participantType: apiParticipantType,
         search: search.trim() || undefined,
-        limit: 50
+        page: nextPage,
+        limit: PAGE_SIZE
       });
       setItems(data.items);
+      setTotal(data.total);
+      setPage(data.page);
     } catch {
       setError('Баримтуудыг уншиж чадсангүй.');
     } finally {
@@ -52,7 +76,8 @@ export default function AdminSubmissionsPage() {
   }
 
   useEffect(() => {
-    void load();
+    setPage(1);
+    void load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, submitterTab]);
 
@@ -66,62 +91,109 @@ export default function AdminSubmissionsPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="text-xs font-semibold text-white/70">Төрөл</label>
-              <select
-                value={submitterTab}
-                onChange={(e) => setSubmitterTab(e.target.value as SubmitterTab)}
-                className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
-              >
-                <option value="all" className="text-slate-900">
-                  Бүгд
-                </option>
-                <option value="user" className="text-slate-900">
-                  Хэрэглэгч
-                </option>
-                <option value="company" className="text-slate-900">
-                  Компани
-                </option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-white/70">Статус</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as Status)}
-                className="h-10 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white outline-none"
-              >
-                <option value="all" className="text-slate-900">
-                  Бүгд
-                </option>
-                <option value="pending" className="text-slate-900">
-                  Pending
-                </option>
-                <option value="approved" className="text-slate-900">
-                  Approved
-                </option>
-                <option value="rejected" className="text-slate-900">
-                  Rejected
-                </option>
-              </select>
-            </div>
-
             <div className="flex items-center gap-2">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setPage(1);
+                    void load(1);
+                  }
+                }}
                 placeholder="Нэр/утас/компани/бүтээгдэхүүн/баримтын №..."
                 className="h-10 w-full sm:w-64 rounded-2xl bg-white/10 ring-1 ring-white/15 px-3 text-sm text-white placeholder:text-white/40 outline-none"
               />
-              <Button size="sm" variant="secondary" onClick={() => void load()}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setPage(1);
+                  void load(1);
+                }}
+              >
                 Хайх
               </Button>
             </div>
           </div>
         </div>
 
+        <div className="mt-5 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {submitterTabs.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setSubmitterTab(t.value)}
+                className={[
+                  'rounded-full px-4 py-2 text-sm font-extrabold ring-1 transition',
+                  submitterTab === t.value
+                    ? 'bg-white text-slate-900 ring-white'
+                    : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                ].join(' ')}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {statusTabs.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setStatus(t.value)}
+                className={[
+                  'rounded-full px-4 py-2 text-sm font-extrabold ring-1 transition',
+                  status === t.value
+                    ? 'bg-sky-400 text-slate-900 ring-sky-300'
+                    : 'bg-white/10 text-white/85 ring-white/15 hover:bg-white/15'
+                ].join(' ')}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-6">
+          {!loading && !error && total > 0 ? (
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-white/70">
+                Нийт <span className="font-extrabold text-white">{total}</span> баримт
+                {total > PAGE_SIZE ? (
+                  <span>
+                    {' '}
+                    · <span className="font-semibold text-white/85">{rangeStart}–{rangeEnd}</span> харуулж байна
+                  </span>
+                ) : null}
+              </div>
+              {totalPages > 1 ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={page <= 1 || loading}
+                    onClick={() => void load(page - 1)}
+                  >
+                    Өмнөх
+                  </Button>
+                  <span className="text-sm font-semibold text-white/80 tabular-nums">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => void load(page + 1)}
+                  >
+                    Дараах
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {loading ? (
             <div className="text-sm text-white/70">Уншиж байна...</div>
           ) : error ? (
@@ -283,6 +355,30 @@ export default function AdminSubmissionsPage() {
               })}
             </div>
           )}
+
+          {!loading && !error && totalPages > 1 ? (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page <= 1}
+                onClick={() => void load(page - 1)}
+              >
+                Өмнөх
+              </Button>
+              <span className="text-sm font-semibold text-white/80 tabular-nums">
+                {page} / {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page >= totalPages}
+                onClick={() => void load(page + 1)}
+              >
+                Дараах
+              </Button>
+            </div>
+          ) : null}
         </div>
       </AdminShell>
     </RequireAdmin>

@@ -15,13 +15,12 @@ type Row = {
 };
 
 const rows: Row[] = [
-  { no: 1, date: '2026-04-30', day: 'Пүрэв', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 0, ball: 0 },
-  { no: 2, date: '2026-05-15', day: 'Баасан', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 0, ball: 0 },
-  { no: 3, date: '2026-05-29', day: 'Баасан', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 2, ball: 2 },
-  { no: 4, date: '2026-06-15', day: 'Даваа', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 2, ball: 2 },
-  { no: 5, date: '2026-06-30', day: 'Мягмар', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 2, ball: 2 },
-  { no: 6, date: '2026-07-15', day: 'Лхагва', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 4, ball: 4 },
-  { no: 7, date: '2026-07-31', day: 'Баасан', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 4, ball: 4 }
+  { no: 1, date: '2026-05-15', day: 'Баасан', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 0, ball: 0 },
+  { no: 2, date: '2026-05-29', day: 'Баасан', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 2, ball: 2 },
+  { no: 3, date: '2026-06-15', day: 'Даваа', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 2, ball: 2 },
+  { no: 4, date: '2026-06-30', day: 'Мягмар', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 2, ball: 2 },
+  { no: 5, date: '2026-07-15', day: 'Лхагва', tv: 1, headphone: 0, ps5: 1, boots: 1, jersey: 4, ball: 4 },
+  { no: 6, date: '2026-07-31', day: 'Баасан', tv: 1, headphone: 1, ps5: 1, boots: 1, jersey: 4, ball: 4 }
 ];
 
 export function DrawScheduleSection() {
