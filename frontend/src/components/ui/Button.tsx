@@ -9,6 +9,7 @@ type Props = {
   className?: string;
   children: React.ReactNode;
   type?: 'button' | 'submit';
+  disabled?: boolean;
 };
 
 const variantStyles: Record<NonNullable<Props['variant']>, string> = {
@@ -32,10 +33,11 @@ export function Button({
   size = 'md',
   className,
   children,
-  type = 'button'
+  type = 'button',
+  disabled = false
 }: Props) {
   const base = cn(
-    'inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
+    'inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50',
     variantStyles[variant],
     sizeStyles[size],
     className
@@ -43,14 +45,14 @@ export function Button({
 
   if (href) {
     return (
-      <Link href={href} className={base}>
+      <Link href={href} className={base} aria-disabled={disabled}>
         {children}
       </Link>
     );
   }
 
   return (
-    <button type={type} onClick={onClick} className={base}>
+    <button type={type} onClick={onClick} className={base} disabled={disabled}>
       {children}
     </button>
   );
