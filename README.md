@@ -69,13 +69,5 @@ Backend: `http://localhost:5000`
 - `http://localhost:3000/admin/draw`
 - `http://localhost:3000/admin/winners`
 
-Админ default credential нь `backend/.env` дээрх:
-
-- `ADMIN_DEFAULT_USERNAME`
-- `ADMIN_DEFAULT_PASSWORD`
-
-Одоогийн default:
-
-- username: `admin`
-- password: `admin123`
+Админ нэвтрэх мэдээллийг `backend/.env` дээр өөрөө тохируулна (`.env.example`-ийг хуулж, жинхэнэ утгуудыг бөглөнө). Баталгаат username/password-ийг GitHub дээр бүү нийтэл.
 

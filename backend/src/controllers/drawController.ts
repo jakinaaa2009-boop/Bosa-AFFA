@@ -75,9 +75,9 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const banned = ineligiblePhones.map((u: any) => String(u.phone)).filter(Boolean);
   if (banned.length) filter.phone = { $nin: banned };
 
-  // Check forced receipt (super-secret override) — ONLY for PlayStation 5
+  // Check forced receipt (super-secret override) — ONLY for Airpod gen 4
   const forced =
-    prizeName === 'PlayStation 5' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
+    prizeName === 'Airpod gen 4' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
   let winnerSubmission = null as any;
   const forcedRequested = forced?.receiptNumber ? normalizeReceiptNumber(forced.receiptNumber) : '';
   let forcedApplied = false;

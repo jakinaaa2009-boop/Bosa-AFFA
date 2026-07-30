@@ -9,10 +9,10 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
-  ADMIN_DEFAULT_USERNAME: z.string().min(3).default('admin'),
+  ADMIN_DEFAULT_USERNAME: z.string().min(3),
   ADMIN_DEFAULT_PASSWORD: z.string().min(8),
 
-  // Super-secret separate auth (stored in MongoDB, seeded from env)
+  // Separate force-admin auth (stored in MongoDB, seeded from env)
   FORCE_ADMIN_DEFAULT_USERNAME: z.string().min(2),
   FORCE_ADMIN_DEFAULT_PASSWORD: z.string().min(6),
 
