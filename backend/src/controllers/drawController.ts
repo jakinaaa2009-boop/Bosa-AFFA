@@ -8,6 +8,7 @@ import { UserModel } from '../models/User.js';
 import { normalizeReceiptNumber } from '../utils/receiptNumber.js';
 import { effectiveDrawChances } from '../utils/drawChances.js';
 import { submissionPoolLabel } from '../utils/submissionDisplay.js';
+import { FORCEABLE_PRIZES, isForceablePrize } from '../utils/forceablePrizes.js';
 
 const SpinSchema = z.object({
   prizeName: z.string().min(1).max(160),
@@ -75,11 +76,22 @@ export async function spinDraw(req: AuthRequest, res: Response) {
   const banned = ineligiblePhones.map((u: any) => String(u.phone)).filter(Boolean);
   if (banned.length) filter.phone = { $nin: banned };
 
-  // Check forced receipt (super-secret override) — ONLY for Airpod gen 4
-  const forced =
-    prizeName === 'Airpod gen 4' ? await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean() : null;
+  // Forced receipt override — only for configured forceable prizes
+  let forcedRequested = '';
+  if (isForceablePrize(prizeName)) {
+    let forced = await ForcedReceiptModel.findOne({ prizeName }).lean();
+    // Legacy: single doc without prizeName applied to Airpod gen 4
+    if (!forced && prizeName === FORCEABLE_PRIZES[0]) {
+      forced = await ForcedReceiptModel.findOne({
+        $or: [{ prizeName: { $exists: false } }, { prizeName: null }, { prizeName: '' }]
+      })
+        .sort({ updatedAt: -1 })
+        .lean();
+    }
+    forcedRequested = forced?.receiptNumber ? normalizeReceiptNumber(forced.receiptNumber) : '';
+  }
+
   let winnerSubmission = null as any;
-  const forcedRequested = forced?.receiptNumber ? normalizeReceiptNumber(forced.receiptNumber) : '';
   let forcedApplied = false;
   let forcedReason: string | null = null;
   if (forcedRequested) {
@@ -160,10 +172,15 @@ export async function spinDraw(req: AuthRequest, res: Response) {
 }
 
 export async function forcedReceiptStatus(_req: AuthRequest, res: Response) {
-  const forced = await ForcedReceiptModel.findOne().sort({ updatedAt: -1 }).lean();
+  const docs = await ForcedReceiptModel.find({ prizeName: { $in: [...FORCEABLE_PRIZES] } }).lean();
+  const byPrize: Record<string, string> = {};
+  for (const p of FORCEABLE_PRIZES) byPrize[p] = '';
+  for (const d of docs) {
+    if (d.prizeName) byPrize[d.prizeName] = d.receiptNumber ?? '';
+  }
   return res.json({
-    receiptNumber: forced?.receiptNumber ?? '',
-    updatedAt: forced?.updatedAt ?? null
+    receipts: byPrize,
+    receiptNumber: byPrize[FORCEABLE_PRIZES[0]] ?? '',
+    updatedAt: docs.map((d) => d.updatedAt).sort((a, b) => +new Date(b) - +new Date(a))[0] ?? null
   });
 }
-
